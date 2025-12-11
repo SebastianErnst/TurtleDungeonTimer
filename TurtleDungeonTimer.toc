@@ -1,0 +1,14 @@
+## Interface: 11200
+## Title: Turtle Dungeon Timer
+## Notes: Advanced dungeon and raid timer with boss tracking, best times, and splits
+## Author: YourName
+## Version: 1.0.0
+## SavedVariables: TurtleDungeonTimerDB
+
+Core.lua
+Data.lua
+UI.lua
+UIMenus.lua
+Timer.lua
+Events.lua
+Commands.lua
