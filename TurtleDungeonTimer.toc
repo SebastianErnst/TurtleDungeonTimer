@@ -9,6 +9,9 @@ Core.lua
 Data.lua
 UI.lua
 UIMenus.lua
+Minimap.lua
 Timer.lua
 Events.lua
+Sync.lua
+Export.lua
 Commands.lua

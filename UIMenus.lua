@@ -16,9 +16,43 @@ function TurtleDungeonTimer:rebuildBossRows()
         return
     end
     
+    -- Organize bosses: required first, then optional
+    local orderedBosses = {}
+    local optionalBossList = {}
+    
+    -- Separate required and optional bosses
+    for i = 1, table.getn(self.bossList) do
+        local bossName = self.bossList[i]
+        if self.optionalBosses[bossName] then
+            table.insert(optionalBossList, bossName)
+        else
+            table.insert(orderedBosses, bossName)
+        end
+    end
+    
+    -- Add optional bosses at the end
+    for i = 1, table.getn(optionalBossList) do
+        table.insert(orderedBosses, optionalBossList[i])
+    end
+    
     local bossRowHeight = 35
     local maxVisibleBosses = 6
-    local numBosses = table.getn(self.bossList)
+    local numBosses = table.getn(orderedBosses)
+    
+    -- Calculate height: check if we have optional bosses
+    local hasOptional = false
+    for i = 1, numBosses do
+        if self.optionalBosses[orderedBosses[i]] then
+            hasOptional = true
+            break
+        end
+    end
+    
+    local headerHeight = 0
+    if hasOptional then
+        headerHeight = 20 -- Space for "Optional" header
+    end
+    
     local scrollHeight = math.min(maxVisibleBosses, numBosses) * (bossRowHeight + 5)
     
     -- Create scroll frame
@@ -35,27 +69,31 @@ function TurtleDungeonTimer:rebuildBossRows()
     -- Create scroll child
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollChild:SetWidth(240)
-    scrollChild:SetHeight(numBosses * (bossRowHeight + 5))
+    
+    local totalHeight = numBosses * (bossRowHeight + 5) + headerHeight
+    scrollChild:SetHeight(totalHeight)
     scrollFrame:SetScrollChild(scrollChild)
     
-    -- Create scrollbar if needed
-    if numBosses > maxVisibleBosses then
-        self:createScrollbar(scrollFrame, scrollHeight, numBosses, maxVisibleBosses, bossRowHeight)
+    -- Create scrollbar if needed (check if total content is taller than visible area)
+    local hasScrollbar = totalHeight > scrollHeight
+    if hasScrollbar then
+        self:createScrollbar(scrollFrame, scrollHeight, totalHeight, maxVisibleBosses, bossRowHeight, headerHeight)
     end
     
-    -- Create boss rows
-    self:createBossRows(scrollChild, numBosses, bossRowHeight)
+    -- Create boss rows with ordered list
+    self:createBossRows(scrollChild, orderedBosses, numBosses, bossRowHeight, hasScrollbar)
     
     self:updateFrameSize()
 end
 
-function TurtleDungeonTimer:createScrollbar(scrollFrame, scrollHeight, numBosses, maxVisibleBosses, bossRowHeight)
+function TurtleDungeonTimer:createScrollbar(scrollFrame, scrollHeight, totalHeight, maxVisibleBosses, bossRowHeight, headerHeight)
     local scrollbar = CreateFrame("Slider", nil, scrollFrame)
     scrollbar:SetOrientation("VERTICAL")
     scrollbar:SetWidth(16)
     scrollbar:SetHeight(scrollHeight)
-    scrollbar:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", 18, 0)
-    scrollbar:SetMinMaxValues(0, (numBosses - maxVisibleBosses) * (bossRowHeight + 5))
+    scrollbar:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", -2, 0)
+    -- Set max scroll value to total content height minus visible height
+    scrollbar:SetMinMaxValues(0, totalHeight - scrollHeight)
     scrollbar:SetValueStep(bossRowHeight + 5)
     scrollbar:SetValue(0)
     scrollbar:SetBackdrop({
@@ -91,12 +129,42 @@ function TurtleDungeonTimer:createScrollbar(scrollFrame, scrollHeight, numBosses
     end)
 end
 
-function TurtleDungeonTimer:createBossRows(scrollChild, numBosses, bossRowHeight)
+function TurtleDungeonTimer:createBossRows(scrollChild, orderedBosses, numBosses, bossRowHeight, hasScrollbar)
+    local currentY = 0
+    local requiredCount = 0
+    local optionalStartIndex = 0
+    
+    -- Adjust boss row width if scrollbar is present
+    local bossRowWidth = hasScrollbar and 205 or 225
+    
+    -- Count required bosses
     for i = 1, numBosses do
+        local bossName = orderedBosses[i]
+        if not self.optionalBosses[bossName] then
+            requiredCount = requiredCount + 1
+        else
+            if optionalStartIndex == 0 then
+                optionalStartIndex = i
+            end
+        end
+    end
+    
+    for i = 1, numBosses do
+        -- Add "Optional" header before first optional boss
+        if i == optionalStartIndex and optionalStartIndex > 0 then
+            local headerText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            headerText:SetPoint("TOP", scrollChild, "TOP", 0, -(currentY + 5))
+            headerText:SetText("|cff888888Optional|r")
+            headerText:SetJustifyH("LEFT")
+            headerText:SetWidth(bossRowWidth)
+            headerText:SetPoint("LEFT", 10, 0)
+            currentY = currentY + 20
+        end
+        
         local bossRow = CreateFrame("Frame", nil, scrollChild)
-        bossRow:SetWidth(225)
+        bossRow:SetWidth(bossRowWidth)
         bossRow:SetHeight(bossRowHeight)
-        bossRow:SetPoint("TOP", scrollChild, "TOP", 0, -((i-1) * (bossRowHeight + 5)))
+        bossRow:SetPoint("TOP", scrollChild, "TOP", 0, -currentY)
         bossRow:SetBackdrop({
             bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
             edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -105,13 +173,24 @@ function TurtleDungeonTimer:createBossRows(scrollChild, numBosses, bossRowHeight
             edgeSize = 16,
             insets = {left = 4, right = 4, top = 4, bottom = 4}
         })
-        bossRow:SetBackdropColor(0.2, 0.2, 0.2, 0.6)
         
-        local bossNameText = bossRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local bossName = orderedBosses[i]
+        local isOptional = self.optionalBosses[bossName]
+        
+        -- Optional bosse bekommen eine andere Hintergrundfarbe
+        if isOptional then
+            bossRow:SetBackdropColor(0.15, 0.15, 0.2, 0.5)
+        else
+            bossRow:SetBackdropColor(0.2, 0.2, 0.2, 0.6)
+        end
+        
+        local bossNameText = bossRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         bossNameText:SetPoint("LEFT", bossRow, "LEFT", 10, 0)
         bossNameText:SetJustifyH("LEFT")
-        bossNameText:SetText(tostring(self.bossList[i]))
+        bossNameText:SetText(tostring(bossName))
+        
         bossRow.nameText = bossNameText
+        bossRow.bossName = bossName
         
         -- Checkmark
         local checkmark = bossRow:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -132,24 +211,94 @@ function TurtleDungeonTimer:createBossRows(scrollChild, numBosses, bossRowHeight
             self.frame.bossRows = {}
         end
         self.frame.bossRows[i] = bossRow
+        
+        currentY = currentY + bossRowHeight + 5
     end
 end
 
 function TurtleDungeonTimer:showDungeonMenu(button)
-    -- Close any existing menus
-    if self.frame.dungeonDropdown then
-        self.frame.dungeonDropdown:Hide()
-        self.frame.dungeonDropdown = nil
+     -- Toggle: if already visible, close everything
+    if self.frame.categoryMenu and self.frame.categoryMenu:IsVisible() then
+        self:hideAllMenus()
+        return
+    end
+    
+    -- Close all existing menus
+    self:hideAllMenus()
+    
+    -- Create Level 1: Dungeons vs Raids
+    local categoryMenu = self:CreateTDTDropdown(button, 135, 60)
+    categoryMenu:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, 0)
+    categoryMenu:Show()
+    self.frame.categoryMenu = categoryMenu
+
+    local dungeonsBtn = self:CreateTDTButton(categoryMenu, "Dungeons", 120, 20)
+    dungeonsBtn:SetPoint("TOP", categoryMenu, "TOP", 0, -8)
+    local dungeonsText = dungeonsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    dungeonsText:SetPoint("LEFT", dungeonsBtn, "LEFT", 5, 0)
+    dungeonsText:SetText("Dungeons")
+    local dungeonsArrow = dungeonsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    dungeonsArrow:SetPoint("RIGHT", dungeonsBtn, "RIGHT", -5, 0)
+    dungeonsArrow:SetText(">")
+    dungeonsBtn:SetScript("OnEnter", function()
+        this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+        this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
+        TurtleDungeonTimer:getInstance():showInstanceList(this, true)
+    end)
+    dungeonsBtn:SetScript("OnLeave", function()
+        this:SetBackdrop(nil)
+    end)
+
+    local raidsBtn = self:CreateTDTButton(categoryMenu, "Raids", 120, 20)
+    raidsBtn:SetPoint("TOP", categoryMenu, "TOP", 0, -32)
+    local raidsText = raidsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    raidsText:SetPoint("LEFT", raidsBtn, "LEFT", 5, 0)
+    raidsText:SetText("Raids")
+    local raidsArrow = raidsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    raidsArrow:SetPoint("RIGHT", raidsBtn, "RIGHT", -5, 0)
+    raidsArrow:SetText(">")
+    raidsBtn:SetScript("OnEnter", function()
+        this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+        this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
+        TurtleDungeonTimer:getInstance():showInstanceList(this, false)
+    end)
+    raidsBtn:SetScript("OnLeave", function()
+        this:SetBackdrop(nil)
+    end)
+end
+
+function TurtleDungeonTimer:hideAllMenus()
+    if self.frame.categoryMenu then
+        self.frame.categoryMenu:Hide()
+        self.frame.categoryMenu = nil
+    end
+    if self.frame.instanceSubmenu then
+        self.frame.instanceSubmenu:Hide()
+        self.frame.instanceSubmenu = nil
+    end
+    if self.frame.variantSubmenu then
+        self.frame.variantSubmenu:Hide()
+        self.frame.variantSubmenu = nil
+    end
+end
+
+function TurtleDungeonTimer:showInstanceList(parentBtn, isDungeonFilter)
+    -- Close existing submenus
+    if self.frame.instanceSubmenu then
+        self.frame.instanceSubmenu:Hide()
+        self.frame.instanceSubmenu = nil
     end
     if self.frame.variantSubmenu then
         self.frame.variantSubmenu:Hide()
         self.frame.variantSubmenu = nil
     end
     
+    -- Build list of instances matching the filter
     local menu = {}
-    for dungeonName, _ in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
-        local name = dungeonName
-        table.insert(menu, {text = name})
+    for instanceName, instanceData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
+        if instanceData.isDungeon == isDungeonFilter or instanceData.isRaid == (not isDungeonFilter) then
+            table.insert(menu, {text = instanceName})
+        end
     end
     
     table.sort(menu, function(a, b) return a.text < b.text end)
@@ -157,13 +306,86 @@ function TurtleDungeonTimer:showDungeonMenu(button)
     local btnHeight = 20
     local numItems = table.getn(menu)
     local maxVisibleItems = 20
-    local dropHeight = math.min(maxVisibleItems * btnHeight + 8, numItems * btnHeight + 8)
+    local menuHeight = math.min(maxVisibleItems * btnHeight + 8, numItems * btnHeight + 8)
     
-    local dropdown = CreateFrame("Frame", nil, button)
-    dropdown:SetWidth(135)
-    dropdown:SetHeight(dropHeight)
-    dropdown:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, 0)
-    dropdown:SetBackdrop({
+    -- Create Level 2 submenu
+    local submenu = self:CreateTDTDropdown(self.frame.categoryMenu, 160, menuHeight)
+    submenu:SetPoint("TOPLEFT", parentBtn, "TOPRIGHT", 0, 0)
+    submenu:Show()
+    self.frame.instanceSubmenu = submenu
+
+    local scrollFrame, scrollChild = self:CreateTDTScrollFrame(submenu, 152, menuHeight - 8)
+    scrollFrame:SetPoint("TOPLEFT", submenu, "TOPLEFT", 4, -4)
+    scrollChild:SetHeight(numItems * btnHeight)
+
+    if numItems > maxVisibleItems then
+        self:CreateTDTScrollbar(scrollFrame, numItems * btnHeight, menuHeight - 8)
+    end
+    
+    -- Create buttons for each instance
+    -- Adjust button width if scrollbar is present
+    local btnWidth = (numItems > maxVisibleItems) and 130 or 145
+    
+    for i = 1, numItems do
+        local item = menu[i]
+        local instanceName = item.text
+        local btn = self:CreateTDTButton(scrollChild, instanceName, btnWidth, btnHeight)
+        btn:SetPoint("TOP", scrollChild, "TOP", 0, -(i-1) * btnHeight)
+        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        text:SetPoint("LEFT", btn, "LEFT", 5, 0)
+        text:SetPoint("RIGHT", btn, "RIGHT", -18, 0)
+        text:SetText(instanceName)
+        text:SetJustifyH("LEFT")
+        local variants = TurtleDungeonTimer.DUNGEON_DATA[instanceName].variants
+        local variantCount = 0
+        for _ in pairs(variants) do
+            variantCount = variantCount + 1
+        end
+        if variantCount > 1 then
+            local arrow = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            arrow:SetPoint("RIGHT", btn, "RIGHT", -5, 0)
+            arrow:SetText(">")
+        end
+        btn:SetScript("OnEnter", function()
+            this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+            this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
+            if variantCount > 1 then
+                TurtleDungeonTimer:getInstance():showVariantSubmenuLevel3(this, instanceName)
+            end
+        end)
+        btn:SetScript("OnLeave", function()
+            this:SetBackdrop(nil)
+        end)
+        btn:SetScript("OnClick", function()
+            TurtleDungeonTimer:getInstance():handleInstanceClick(instanceName, variantCount)
+        end)
+    end
+end
+
+function TurtleDungeonTimer:showVariantSubmenuLevel3(parentBtn, instanceName)
+    -- Close existing variant submenu
+    if self.frame.variantSubmenu then
+        self.frame.variantSubmenu:Hide()
+        self.frame.variantSubmenu = nil
+    end
+    
+    local variants = TurtleDungeonTimer.DUNGEON_DATA[instanceName].variants
+    local variantMenu = {}
+    for variantName, _ in pairs(variants) do
+        table.insert(variantMenu, variantName)
+    end
+    table.sort(variantMenu)
+    
+    local btnHeight = 20
+    local numVariants = table.getn(variantMenu)
+    local menuHeight = numVariants * btnHeight + 8
+    
+    -- Create Level 3 submenu for variants
+    local submenu = CreateFrame("Frame", nil, self.frame.instanceSubmenu)
+    submenu:SetWidth(135)
+    submenu:SetHeight(menuHeight)
+    submenu:SetPoint("TOPLEFT", parentBtn, "TOPRIGHT", 0, 0)
+    submenu:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true,
@@ -171,194 +393,54 @@ function TurtleDungeonTimer:showDungeonMenu(button)
         edgeSize = 16,
         insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
-    dropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    dropdown:SetFrameStrata("DIALOG")
-    self.frame.dungeonDropdown = dropdown
+    submenu:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    submenu:SetFrameStrata("DIALOG")
+    submenu:Show()
+    self.frame.variantSubmenu = submenu
     
-    self:createDungeonDropdownScroll(dropdown, dropHeight, menu, numItems, btnHeight, maxVisibleItems)
-end
-
-function TurtleDungeonTimer:createDungeonDropdownScroll(dropdown, dropHeight, menu, numItems, btnHeight, maxVisibleItems)
-    -- Scroll Frame
-    local scrollFrame = CreateFrame("ScrollFrame", nil, dropdown)
-    scrollFrame:SetWidth(120)
-    scrollFrame:SetHeight(dropHeight - 8)
-    scrollFrame:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 4, -4)
-    
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(120)
-    scrollChild:SetHeight(numItems * btnHeight)
-    scrollFrame:SetScrollChild(scrollChild)
-    
-    -- Scrollbar
-    local scrollbar = CreateFrame("Slider", nil, scrollFrame)
-    scrollbar:SetOrientation("VERTICAL")
-    scrollbar:SetWidth(16)
-    scrollbar:SetHeight(dropHeight - 8)
-    scrollbar:SetPoint("TOPRIGHT", dropdown, "TOPRIGHT", -4, -4)
-    scrollbar:SetMinMaxValues(0, math.max(0, (numItems - maxVisibleItems) * btnHeight))
-    scrollbar:SetValueStep(btnHeight)
-    scrollbar:SetValue(0)
-    scrollbar:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true,
-        tileSize = 16,
-        edgeSize = 8,
-        insets = {left = 3, right = 3, top = 3, bottom = 3}
-    })
-    scrollbar:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
-    
-    local thumb = scrollbar:CreateTexture(nil, "OVERLAY")
-    thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-    thumb:SetWidth(16)
-    thumb:SetHeight(24)
-    scrollbar:SetThumbTexture(thumb)
-    
-    scrollbar:SetScript("OnValueChanged", function()
-        scrollFrame:SetVerticalScroll(this:GetValue())
-    end)
-    
-    scrollFrame:EnableMouseWheel(true)
-    scrollFrame:SetScript("OnMouseWheel", function()
-        local delta = arg1
-        local current = scrollbar:GetValue()
-        local minVal, maxVal = scrollbar:GetMinMaxValues()
-        if delta < 0 and current < maxVal then
-            scrollbar:SetValue(math.min(maxVal, current + btnHeight))
-        elseif delta > 0 and current > minVal then
-            scrollbar:SetValue(math.max(minVal, current - btnHeight))
-        end
-    end)
-    
-    -- Create menu items
-    self:createDungeonMenuItems(scrollChild, menu, numItems, btnHeight, dropdown)
-end
-
-function TurtleDungeonTimer:createDungeonMenuItems(scrollChild, menu, numItems, btnHeight, dropdown)
-    for i = 1, numItems do
-        local item = menu[i]
-        local dungeonName = item.text
+    -- Create buttons for each variant
+    for j = 1, numVariants do
+        local variantName = variantMenu[j]
         
-        local btn = CreateFrame("Button", nil, scrollChild)
-        btn:SetWidth(112)
-        btn:SetHeight(btnHeight)
-        btn:SetPoint("TOP", scrollChild, "TOP", 0, -(i-1) * btnHeight)
+        local vBtn = CreateFrame("Button", nil, submenu)
+        vBtn:SetWidth(120)
+        vBtn:SetHeight(btnHeight)
+        vBtn:SetPoint("TOP", submenu, "TOP", 0, -4 - (j-1) * btnHeight)
         
-        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        text:SetPoint("LEFT", btn, "LEFT", 5, 0)
-        text:SetText(tostring(dungeonName))
-        text:SetJustifyH("LEFT")
-        btn.text = text
+        local vText = vBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        vText:SetPoint("LEFT", vBtn, "LEFT", 5, 0)
+        vText:SetText(variantName)
+        vText:SetJustifyH("LEFT")
         
-        -- Check if this dungeon has multiple variants
-        local variants = TurtleDungeonTimer.DUNGEON_DATA[dungeonName].variants
-        local variantCount = 0
-        for _ in pairs(variants) do
-            variantCount = variantCount + 1
-        end
-        
-        -- Add arrow indicator if multiple variants
-        if variantCount > 1 then
-            local arrow = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            arrow:SetPoint("RIGHT", btn, "RIGHT", -5, 0)
-            arrow:SetText(">")
-            btn.arrow = arrow
-        end
-        
-        btn:SetScript("OnEnter", function()
+        vBtn:SetScript("OnEnter", function()
             this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-            this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
-            
-            TurtleDungeonTimer:getInstance():showVariantSubmenu(this, dungeonName, dropdown, variantCount)
+            this:SetBackdropColor(0.4, 0.4, 0.4, 0.8)
         end)
         
-        btn:SetScript("OnLeave", function()
+        vBtn:SetScript("OnLeave", function()
             this:SetBackdrop(nil)
         end)
         
-        btn:SetScript("OnClick", function()
-            TurtleDungeonTimer:getInstance():handleDungeonClick(dungeonName, variantCount, dropdown)
+        vBtn:SetScript("OnClick", function()
+            TurtleDungeonTimer:getInstance():selectDungeonVariant(instanceName, variantName)
         end)
     end
 end
 
-function TurtleDungeonTimer:showVariantSubmenu(btn, dungeonName, dropdown, variantCount)
-    -- Hide any existing submenu
-    if self.frame.variantSubmenu then
-        self.frame.variantSubmenu:Hide()
-        self.frame.variantSubmenu = nil
-    end
-    
-    -- Show variant submenu if multiple variants exist
-    if variantCount > 1 then
-        local variantList = TurtleDungeonTimer.DUNGEON_DATA[dungeonName].variants
-        
-        local submenu = CreateFrame("Frame", nil, dropdown)
-        submenu:SetWidth(180)
-        submenu:SetHeight(math.min(200, variantCount * 20 + 8))
-        submenu:SetPoint("TOPLEFT", btn, "TOPRIGHT", 0, 0)
-        submenu:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true,
-            tileSize = 16,
-            edgeSize = 16,
-            insets = {left = 4, right = 4, top = 4, bottom = 4}
-        })
-        submenu:SetBackdropColor(0.15, 0.15, 0.15, 0.95)
-        submenu:SetFrameStrata("TOOLTIP")
-        self.frame.variantSubmenu = submenu
-        
-        local variantMenu = {}
-        for variantName, _ in pairs(variantList) do
-            table.insert(variantMenu, variantName)
-        end
-        table.sort(variantMenu)
-        
-        for j = 1, table.getn(variantMenu) do
-            local vName = variantMenu[j]
-            local vBtn = CreateFrame("Button", nil, submenu)
-            vBtn:SetWidth(168)
-            vBtn:SetHeight(18)
-            vBtn:SetPoint("TOP", submenu, "TOP", 0, -4 - (j-1) * 20)
-            
-            local vText = vBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            vText:SetPoint("LEFT", vBtn, "LEFT", 5, 0)
-            vText:SetText(tostring(vName))
-            vText:SetJustifyH("LEFT")
-            
-            vBtn:SetScript("OnEnter", function()
-                this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-                this:SetBackdropColor(0.4, 0.4, 0.4, 0.8)
-            end)
-            vBtn:SetScript("OnLeave", function()
-                this:SetBackdrop(nil)
-            end)
-            vBtn:SetScript("OnClick", function()
-                TurtleDungeonTimer:getInstance():selectDungeon(dungeonName)
-                TurtleDungeonTimer:getInstance():selectVariant(vName)
-                dropdown:Hide()
-                submenu:Hide()
-            end)
-        end
-    end
-end
-
-function TurtleDungeonTimer:handleDungeonClick(dungeonName, variantCount, dropdown)
-    -- Auto-select if only one variant
+function TurtleDungeonTimer:handleInstanceClick(instanceName, variantCount)
     if variantCount == 1 then
-        local vList = TurtleDungeonTimer.DUNGEON_DATA[dungeonName].variants
-        local singleVariant = nil
-        for vName, _ in pairs(vList) do
-            singleVariant = vName
+        -- Only one variant, select it directly
+        local variants = TurtleDungeonTimer.DUNGEON_DATA[instanceName].variants
+        for variantName, _ in pairs(variants) do
+            self:selectDungeonVariant(instanceName, variantName)
             break
         end
-        
-        self:selectDungeon(dungeonName)
-        self:selectVariant(singleVariant)
-        dropdown:Hide()
-    else
-        self:selectDungeon(dungeonName)
     end
+    -- If multiple variants, user must choose from Level 3 submenu
+end
+
+function TurtleDungeonTimer:selectDungeonVariant(instanceName, variantName)
+    self:selectDungeon(instanceName)
+    self:selectVariant(variantName)
+    self:hideAllMenus()
 end

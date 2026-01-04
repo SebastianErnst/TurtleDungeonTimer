@@ -1,0 +1,52 @@
+{
+  "runtime": {
+    "version": "Lua 5.0"
+  },
+  "diagnostics": {
+    "globals": [
+      "TurtleDungeonTimer",
+      "GetTime",
+      "math",
+      "string",
+      "pairs",
+      "GetNumRaidMembers",
+      "GetNumPartyMembers",
+      "CreateFrame",
+      "SendAddonMessage",
+      "UnitName",
+      "DEFAULT_CHAT_FRAME",
+      "UIParent",
+      "event",
+      "arg1",
+      "arg2",
+      "arg3",
+      "arg4",
+      "this"
+    ],
+    "disable": [
+      "lowercase-global",
+      "undefined-global",
+      "trailing-space",
+      "need-check-nil",
+      "close-non-object",
+      "cast-local-type",
+      "cast-type-mismatch",
+      "redefined-local",
+      "deprecated",
+      "missing-parameter",
+      "missing-return",
+      "missing-return-value",
+      "redundant-return",
+      "redundant-return-value",
+      "redundant-value",
+      "empty-block"
+    ]
+  },
+  "workspace": {
+    "library": [],
+    "checkThirdParty": false,
+    "ignoreDir": [
+      ".vscode"
+    ]
+  }
+}

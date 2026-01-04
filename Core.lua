@@ -38,9 +38,12 @@ function TurtleDungeonTimer:new()
     self.selectedDungeon = nil
     self.selectedVariant = nil
     self.bossList = {}
+    self.optionalBosses = {} -- Table of optional boss names
     self.killTimes = {}
     self.deathCount = 0
     self.bossListExpanded = true
+    self.minimized = false
+    self.initialized = false
     
     -- Initialize database
     self:initializeDatabase()
@@ -59,8 +62,54 @@ function TurtleDungeonTimer:initializeDatabase()
                 countdownDuration = 5,
                 showSplits = true
             },
-            lastSelection = {}
+            lastSelection = {},
+            lastRun = {},
+            history = {},
+            position = {
+                point = "TOP",
+                relativeTo = "UIParent",
+                relativePoint = "TOP",
+                xOfs = 0,
+                yOfs = -100
+            },
+            visible = false
         }
+    end
+    
+    -- Ensure history exists for old saves
+    if not TurtleDungeonTimerDB.history then
+        TurtleDungeonTimerDB.history = {}
+    end
+    
+    -- Ensure position table exists for old saves
+    if not TurtleDungeonTimerDB.position then
+        TurtleDungeonTimerDB.position = {
+            point = "TOP",
+            relativeTo = "UIParent",
+            relativePoint = "TOP",
+            xOfs = 0,
+            yOfs = -100
+        }
+    end
+    
+    -- Ensure visible flag exists for old saves
+    if TurtleDungeonTimerDB.visible == nil then
+        TurtleDungeonTimerDB.visible = false
+    end
+    
+    -- Ensure minimized flag exists for old saves
+    if TurtleDungeonTimerDB.minimized == nil then
+        TurtleDungeonTimerDB.minimized = false
+    end
+    
+    -- Ensure minimap angle exists for old saves
+    if TurtleDungeonTimerDB.minimapAngle == nil then
+        TurtleDungeonTimerDB.minimapAngle = 200
+    end
+    
+    -- Ensure lastRun table exists for old saves
+    if not TurtleDungeonTimerDB.lastRun then
+        TurtleDungeonTimerDB.lastRun = {}
     end
 end
 
@@ -101,7 +150,6 @@ function TurtleDungeonTimer:saveBestTime(totalTime)
             date = date("%Y-%m-%d %H:%M"),
             deaths = self.deathCount
         }
-        print("NEW RECORD! " .. self:formatTime(totalTime) .. " (Previous: " .. (current and self:formatTime(current.time) or "none") .. ")")
         return true
     end
     return false
@@ -111,9 +159,14 @@ end
 -- PUBLIC INTERFACE
 -- ============================================================================
 function TurtleDungeonTimer:initialize()
+    if self.initialized then return end
+    self.initialized = true
+    
     self:createUI()
     self:setupUpdateLoop()
     self:registerEvents()
+    self:initializeSync()
+    self:createMinimapButton()
     
     -- Load last selection
     if TurtleDungeonTimerDB.lastSelection.dungeon then
@@ -123,18 +176,32 @@ function TurtleDungeonTimer:initialize()
         end
     end
     
-    print("Turtle Dungeon Timer initialized! Use /tdt to toggle the window.")
+    -- Restore visibility state
+    if TurtleDungeonTimerDB.visible then
+        self:show()
+    end
+    
+    -- Restore minimized state
+    if TurtleDungeonTimerDB.minimized then
+        self.minimized = true
+        self:updateMinimizedState()
+    end
+    
+    -- Restore last run if available
+    self:restoreLastRun()
 end
 
 function TurtleDungeonTimer:show()
     if self.frame then
         self.frame:Show()
+        TurtleDungeonTimerDB.visible = true
     end
 end
 
 function TurtleDungeonTimer:hide()
     if self.frame then
         self.frame:Hide()
+        TurtleDungeonTimerDB.visible = false
     end
 end
 
@@ -142,8 +209,127 @@ function TurtleDungeonTimer:toggle()
     if self.frame then
         if self.frame:IsVisible() then
             self.frame:Hide()
+            TurtleDungeonTimerDB.visible = false
         else
             self.frame:Show()
+            TurtleDungeonTimerDB.visible = true
+        end
+    end
+end
+
+function TurtleDungeonTimer:saveLastRun()
+    if not self.selectedDungeon or not self.selectedVariant then return end
+    
+    TurtleDungeonTimerDB.lastRun = {
+        dungeon = self.selectedDungeon,
+        variant = self.selectedVariant,
+        bossList = self.bossList,
+        killTimes = self.killTimes,
+        deathCount = self.deathCount,
+        startTime = self.startTime,
+        playerName = self.playerName,
+        guildName = self.guildName,
+        groupClasses = self.groupClasses
+    }
+end
+
+function TurtleDungeonTimer:saveToHistory(finalTime, completed)
+    if not self.selectedDungeon or not self.selectedVariant then return end
+    
+    local historyEntry = {
+        dungeon = self.selectedDungeon,
+        variant = self.selectedVariant,
+        time = finalTime,
+        deathCount = self.deathCount,
+        killTimes = self.killTimes,
+        timestamp = time(),
+        date = date("%Y-%m-%d %H:%M"),
+        completed = completed or false,
+        playerName = self.playerName or "Unknown",
+        guildName = self.guildName or "No Guild",
+        groupClasses = self.groupClasses or {}
+    }
+    
+    -- Add to beginning of history
+    table.insert(TurtleDungeonTimerDB.history, 1, historyEntry)
+    
+    -- Keep only last 10 entries
+    while table.getn(TurtleDungeonTimerDB.history) > 10 do
+        table.remove(TurtleDungeonTimerDB.history)
+    end
+end
+
+function TurtleDungeonTimer:restoreLastRun()
+    local lastRun = TurtleDungeonTimerDB.lastRun
+    if not lastRun or not lastRun.dungeon or not lastRun.variant then return end
+    
+    -- Check if we're viewing the same dungeon
+    if self.selectedDungeon == lastRun.dungeon and self.selectedVariant == lastRun.variant then
+        self.killTimes = lastRun.killTimes or {}
+        self.deathCount = lastRun.deathCount or 0
+        self.playerName = lastRun.playerName
+        self.guildName = lastRun.guildName
+        self.groupClasses = lastRun.groupClasses
+        
+        -- Update UI with saved data
+        if self.frame then
+            -- Update death counter
+            if self.frame.deathText then
+                self.frame.deathText:SetText("Deaths: " .. self.deathCount)
+            end
+            
+            -- Update total time from last kill
+            if table.getn(self.killTimes) > 0 and self.frame.timeText then
+                local finalTime = self.killTimes[table.getn(self.killTimes)].time
+                self.frame.timeText:SetText(self:formatTime(finalTime))
+                
+                -- Set color based on comparison with best time
+                local bestTime = self:getBestTime()
+                if bestTime then
+                    if finalTime < bestTime.time then
+                        self.frame.timeText:SetTextColor(0, 1, 0) -- Green = better than best
+                    else
+                        self.frame.timeText:SetTextColor(1, 0.5, 0.5) -- Red = worse than best
+                    end
+                else
+                    self.frame.timeText:SetTextColor(1, 1, 1) -- White = no best time
+                end
+            end
+            
+            -- Update boss rows with kill times
+            for i = 1, table.getn(self.killTimes) do
+                local killData = self.killTimes[i]
+                if killData then
+                    self:updateBossRow(killData.index, killData.time, killData.splitTime)
+                end
+            end
+            
+            -- Update header if all bosses defeated
+            local requiredBosses = self:getRequiredBossCount()
+            local requiredKills = self:getRequiredBossKills()
+            if requiredKills >= requiredBosses then
+                if self.frame.headerBg then
+                    self.frame.headerBg:SetBackdropColor(0.1, 0.5, 0.1, 0.8)
+                end
+                if self.frame.dungeonNameText then
+                    self.frame.dungeonNameText:SetTextColor(0, 1, 0)
+                end
+                if self.frame.timeText then
+                    -- Ensure time color is set correctly (green if better than best time)
+                    local bestTime = self:getBestTime()
+                    if bestTime and table.getn(self.killTimes) > 0 then
+                        local finalTime = self.killTimes[table.getn(self.killTimes)].time
+                        if finalTime < bestTime.time then
+                            self.frame.timeText:SetTextColor(0, 1, 0)
+                        else
+                            self.frame.timeText:SetTextColor(1, 0.5, 0.5)
+                        end
+                    end
+                end
+            end
+            
+            -- Update button state
+            self:updateStartPauseButton()
         end
     end
 end

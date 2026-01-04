@@ -4,44 +4,304 @@
 
 function TurtleDungeonTimer:start()
     if not self.selectedDungeon or not self.selectedVariant then
-        print("Please select a dungeon and variant first!")
         return
     end
     
     if table.getn(self.bossList) == 0 then
-        print("No bosses configured for this dungeon!")
         return
     end
     
-    -- Start countdown
-    self.isCountingDown = true
-    self.countdownTime = GetTime() + TurtleDungeonTimerDB.settings.countdownDuration
+    -- Don't allow start if run is completed (all required bosses defeated)
+    local requiredBosses = self:getRequiredBossCount()
+    local requiredKills = self:getRequiredBossKills()
+    if requiredKills >= requiredBosses and requiredBosses > 0 then
+        return
+    end
+    
+    -- Don't allow start if already running
+    if self.isRunning then
+        return
+    end
+    
+    -- Start timer immediately
+    self.isRunning = true
+    self.startTime = GetTime()
     self.killTimes = {}
     self.deathCount = 0
+    
+    -- Collect player and group info
+    self.playerName = UnitName("player") or "Unknown"
+    self.guildName = GetGuildInfo("player") or "No Guild"
+    self.groupClasses = self:collectGroupClasses()
+    
+    -- Send chat message to user
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer gestartet!", 1, 1, 0)
     
     -- Reset UI
     self:resetUI()
     
-    print("Countdown starting: " .. TurtleDungeonTimerDB.settings.countdownDuration .. " seconds...")
+    -- Minimize the frame
+    if not self.minimized then
+        self:toggleMinimized()
+    end
+end
+
+function TurtleDungeonTimer:showResetConfirmation()
+    if self.resetConfirmDialog then
+        self.resetConfirmDialog:Show()
+        return
+    end
+    
+    -- Create confirmation dialog
+    local dialog = CreateFrame("Frame", nil, UIParent)
+    dialog:SetWidth(300)
+    dialog:SetHeight(120)
+    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+    dialog:SetFrameStrata("DIALOG")
+    dialog:EnableMouse(true)
+    self.resetConfirmDialog = dialog
+    
+    -- Title
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", dialog, "TOP", 0, -15)
+    title:SetText("Reset Run?")
+    title:SetTextColor(1, 0.82, 0)
+    
+    -- Message
+    local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    message:SetPoint("TOP", title, "BOTTOM", 0, -10)
+    message:SetWidth(260)
+    message:SetText("Do you want to reset the current run?")
+    message:SetJustifyH("CENTER")
+    
+    -- Yes Button
+    local yesButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    yesButton:SetWidth(100)
+    yesButton:SetHeight(30)
+    yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
+    yesButton:SetText("Yes")
+    yesButton:SetScript("OnClick", function()
+        dialog:Hide()
+        TurtleDungeonTimer:getInstance():performReset()
+    end)
+    
+    -- No Button
+    local noButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    noButton:SetWidth(100)
+    noButton:SetHeight(30)
+    noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
+    noButton:SetText("No")
+    noButton:SetScript("OnClick", function()
+        dialog:Hide()
+    end)
+    
+    dialog:Show()
 end
 
 function TurtleDungeonTimer:stop()
+    -- Stop/abort the current run without saving
     self.isRunning = false
-    self.isCountingDown = false
+    self.startTime = nil
     
-    local finalTime = 0
-    if self.startTime then
-        finalTime = GetTime() - self.startTime
+    -- Sync timer stop with group
+    self:syncTimerStop()
+    
+    -- Update button text
+    self:updateStartPauseButton()
+end
+
+function TurtleDungeonTimer:reset()
+    -- Check if there's any data that would be reset
+    local lastRun = TurtleDungeonTimerDB.lastRun
+    local hasLastRun = lastRun and lastRun.dungeon == self.selectedDungeon 
+        and lastRun.variant == self.selectedVariant 
+        and lastRun.killTimes and table.getn(lastRun.killTimes) > 0
+    local hasCurrentData = table.getn(self.killTimes) > 0 or self.deathCount > 0 or self.isRunning
+    
+    -- if hasLastRun or hasCurrentData then
+        -- Show reset confirmation dialog
+        self:showResetConfirmation()
+    --     return
+    -- end
+    
+    -- self:performReset()
+end
+
+function TurtleDungeonTimer:performReset()
+    -- Check if we're in a group
+    -- if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
+        -- Solo: Reset directly
+        self:syncTimerReset()
+    --     return
+    -- end
+    
+    -- In a group: Show confirmation dialog before starting vote
+    -- self:showResetInitiateConfirmation()
+end
+
+function TurtleDungeonTimer:showResetInitiateConfirmation()
+    -- Create confirmation dialog
+    local dialog = CreateFrame("Frame", nil, UIParent)
+    dialog:SetWidth(350)
+    dialog:SetHeight(150)
+    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+    dialog:EnableMouse(true)
+    
+    -- Title
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", dialog, "TOP", 0, -15)
+    title:SetText("Timer Reset")
+    title:SetTextColor(1, 0.82, 0)
+    
+    -- Message
+    local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    message:SetPoint("TOP", title, "BOTTOM", 0, -15)
+    message:SetWidth(300)
+    message:SetText("Möchtest du eine Reset-Abstimmung\nin der Gruppe starten?")
+    message:SetJustifyH("CENTER")
+    
+    -- Yes Button
+    local yesButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    yesButton:SetWidth(100)
+    yesButton:SetHeight(30)
+    yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
+    yesButton:SetText("Ja")
+    yesButton:SetScript("OnClick", function()
+        dialog:Hide()
+        -- Start voting process (this also acts as addon check)
+        TurtleDungeonTimer:getInstance():syncTimerReset()
+    end)
+    
+    -- No Button
+    local noButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    noButton:SetWidth(100)
+    noButton:SetHeight(30)
+    noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
+    noButton:SetText("Nein")
+    noButton:SetScript("OnClick", function()
+        dialog:Hide()
+    end)
+    
+    dialog:Show()
+end
+
+function TurtleDungeonTimer:performResetDirect()
+    -- Direct reset without voting
+    self.isRunning = false
+    self.killTimes = {}
+    self.deathCount = 0
+    self.startTime = nil
+    self.currentRunId = nil
+    
+    -- Clear last run from database
+    TurtleDungeonTimerDB.lastRun = {}
+    
+    -- Reset UI
+    self:resetUI()
+    
+    -- Update button text
+    self:updateStartPauseButton()
+    
+    -- Show success message
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer wurde zurückgesetzt", 1, 1, 0)
+end
+
+function TurtleDungeonTimer:performResetSilent()
+    -- Silent reset without sync (used by sync system)
+    self.isRunning = false
+    self.killTimes = {}
+    self.deathCount = 0
+    self.startTime = nil
+    self.currentRunId = nil  -- Clear run ID on reset
+    
+    -- Clear last run from database
+    TurtleDungeonTimerDB.lastRun = {}
+    
+    -- Reset UI
+    self:resetUI()
+    
+    -- Update button text
+    self:updateStartPauseButton()
+end
+
+function TurtleDungeonTimer:updateStartPauseButton()
+    if not self.frame or not self.frame.startPauseButton then return end
+    
+    -- Check if run is completed
+    local requiredBosses = self:getRequiredBossCount()
+    local requiredKills = self:getRequiredBossKills()
+    local isCompleted = requiredKills >= requiredBosses and requiredBosses > 0
+    
+    if isCompleted then
+        self.frame.startPauseButton:SetText("START")
+        self.frame.startPauseButton:Disable()
+    else
+        self.frame.startPauseButton:Enable()
+        if self.isRunning or self.isCountingDown then
+            self.frame.startPauseButton:SetText("PAUSE")
+        else
+            self.frame.startPauseButton:SetText("START")
+        end
+    end
+end
+
+function TurtleDungeonTimer:collectGroupClasses()
+    local classes = {}
+    
+    -- Add player's class and name
+    local playerName = UnitName("player")
+    local _, playerClass = UnitClass("player")
+    if playerClass and playerName then
+        table.insert(classes, playerClass .. ":" .. playerName)
     end
     
-    print("Timer stopped! Total time: " .. self:formatTime(finalTime))
-    print("Kills: " .. table.getn(self.killTimes) .. "/" .. table.getn(self.bossList))
-    print("Deaths: " .. self.deathCount)
+    -- Check if in raid
+    if GetNumRaidMembers() > 0 then
+        for i = 1, GetNumRaidMembers() do
+            if i ~= 0 then -- Skip raid0 (that's the player)
+                local unit = "raid" .. i
+                local name = UnitName(unit)
+                local _, class = UnitClass(unit)
+                if class and name then
+                    table.insert(classes, class .. ":" .. name)
+                end
+            end
+        end
+    -- Check if in party
+    elseif GetNumPartyMembers() > 0 then
+        for i = 1, GetNumPartyMembers() do
+            local unit = "party" .. i
+            local name = UnitName(unit)
+            local _, class = UnitClass(unit)
+            if class and name then
+                table.insert(classes, class .. ":" .. name)
+            end
+        end
+    end
+    
+    return classes
 end
 
 function TurtleDungeonTimer:report(chatType)
-    if not self.startTime then
-        print("No timer data to report!")
+    -- Check if there's any data to report
+    if not self.startTime and table.getn(self.killTimes) == 0 then
         return
     end
     
@@ -69,12 +329,32 @@ function TurtleDungeonTimer:report(chatType)
     local mainMessage = dungeonStr .. " completed in " .. self:formatTime(finalTime) .. ". Deaths: " .. self.deathCount
     SendChatMessage(mainMessage, chatType)
     
-    for i = 1, table.getn(self.killTimes) do
-        local bossMessage = i .. ". " .. self.killTimes[i].bossName .. " " .. self:formatTime(self.killTimes[i].time)
-        SendChatMessage(bossMessage, chatType)
+    -- Combine bosses into readable messages (max ~255 chars per message)
+    if table.getn(self.killTimes) > 0 then
+        local bossLine = "Bosses: "
+        local lineCount = 0
+        
+        for i = 1, table.getn(self.killTimes) do
+            local bossEntry = self.killTimes[i].bossName .. " (" .. self:formatTime(self.killTimes[i].time) .. ")"
+            
+            -- Check if adding this boss would make the line too long
+            if string.len(bossLine .. bossEntry) > 240 then
+                SendChatMessage(bossLine, chatType)
+                bossLine = bossEntry
+                lineCount = lineCount + 1
+            else
+                if i > 1 and bossLine ~= "Bosses: " then
+                    bossLine = bossLine .. ", "
+                end
+                bossLine = bossLine .. bossEntry
+            end
+        end
+        
+        -- Send remaining bosses
+        if bossLine ~= "Bosses: " then
+            SendChatMessage(bossLine, chatType)
+        end
     end
-    
-    print("Report sent to " .. chatType)
 end
 
 function TurtleDungeonTimer:setupUpdateLoop()
@@ -89,23 +369,7 @@ end
 function TurtleDungeonTimer:updateTimer()
     if not self.frame then return end
     
-    if self.isCountingDown then
-        local remaining = self.countdownTime - GetTime()
-        if remaining <= 0 then
-            self.isCountingDown = false
-            self.isRunning = true
-            self.startTime = GetTime()
-            if self.frame.timeText then
-                self.frame.timeText:SetTextColor(1, 1, 1)
-            end
-            print("TIMER STARTED!")
-        else
-            if self.frame.timeText then
-                self.frame.timeText:SetText(string.format("%.0f", math.ceil(remaining)))
-                self.frame.timeText:SetTextColor(1, 1, 0)
-            end
-        end
-    elseif self.isRunning and self.startTime then
+    if self.isRunning and self.startTime then
         local elapsed = GetTime() - self.startTime
         if self.frame.timeText then
             self.frame.timeText:SetText(self:formatTime(elapsed))
