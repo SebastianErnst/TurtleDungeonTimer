@@ -14,7 +14,6 @@ TurtleDungeonTimer.currentRunId = nil
 -- UUID GENERATION
 -- ============================================================================
 function TurtleDungeonTimer:generateRunId()
-    print("[TDT] generateRunId")
     local timestamp = math.floor(GetTime() * 1000)
     local random = math.random(10000, 99999)
     return timestamp .. "-" .. random
@@ -24,7 +23,6 @@ end
 -- PLAYERS WITH ADDON TRACKING
 -- ============================================================================
 function TurtleDungeonTimer:checkForAddons()
-    print("[TDT] checkForAddons")
     self.playersWithAddon = {}
     
     if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
@@ -35,12 +33,10 @@ function TurtleDungeonTimer:checkForAddons()
 end
 
 function TurtleDungeonTimer:onAddonCheckResponse(sender)
-    print("[TDT] onAddonCheckResponse")
     self.playersWithAddon[sender] = true
 end
 
 function TurtleDungeonTimer:getAddonUserCount()
-    print("[TDT] getAddonUserCount")
     local count = 0
     for _ in pairs(self.playersWithAddon) do
         count = count + 1
@@ -65,7 +61,6 @@ function TurtleDungeonTimer:syncFrameOnEvent()
 end
 
 function TurtleDungeonTimer:initializeSync()
-    print("[TDT] initializeSync")
     if not self.syncFrame then
         self.syncFrame = CreateFrame("Frame")
         self.syncFrame:RegisterEvent("CHAT_MSG_ADDON")
@@ -81,7 +76,6 @@ end
 -- SEND SYNC MESSAGES
 -- ============================================================================
 function TurtleDungeonTimer:sendSyncMessage(msgType, data)
-    print("[TDT] sendSyncMessage: " .. msgType)
     if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
         return
     end
@@ -105,7 +99,6 @@ end
 -- RESET SYSTEM
 -- ============================================================================
 function TurtleDungeonTimer:syncTimerReset()
-    print("[TDT] syncTimerReset")
     local addonUserCount = self:getAddonUserCount()
     if addonUserCount == 0 then
         
@@ -117,7 +110,6 @@ function TurtleDungeonTimer:syncTimerReset()
 end
 
 function TurtleDungeonTimer:startResetVote()
-    print("[TDT] startResetVote")
     self:sendSyncMessage("RESET_REQUEST")
     
     self.resetVotes = {}
@@ -128,7 +120,6 @@ function TurtleDungeonTimer:startResetVote()
 end
 
 function TurtleDungeonTimer:voteReset(vote)
-    print("[TDT] voteReset: " .. tostring(vote))
     local playerName = UnitName("player")
     
     self.resetVotes[playerName] = vote
@@ -143,7 +134,6 @@ function TurtleDungeonTimer:voteReset(vote)
 end
 
 function TurtleDungeonTimer:checkResetVotes()
-    print("[TDT] checkResetVotes")
     if not self.resetVotes then
         return
     end
@@ -183,7 +173,6 @@ end
 -- RECEIVE SYNC MESSAGES
 -- ============================================================================
 function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
-    print("[TDT] onSyncMessage from " .. sender)
     local playerName = UnitName("player")
     if sender == playerName then
         return
@@ -220,7 +209,6 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
 end
 
 function TurtleDungeonTimer:onSyncResetRequest(sender)
-    print("[TDT] onSyncResetRequest from " .. sender)
     self.resetInitiator = sender
     self.resetVotes = {}
     
@@ -232,7 +220,6 @@ function TurtleDungeonTimer:onSyncResetRequest(sender)
 end
 
 function TurtleDungeonTimer:onSyncResetVote(data, sender)
-    print("[TDT] onSyncResetVote from " .. sender)
     local _, _, playerName, vote = string.find(data, "([^;]+);([^;]+)")
     
     if not playerName or not vote then
@@ -252,7 +239,6 @@ function TurtleDungeonTimer:onSyncResetVote(data, sender)
 end
 
 function TurtleDungeonTimer:onSyncResetCancel(sender)
-    print("[TDT] onSyncResetCancel from " .. sender)
     self.resetVotes = {}
     self.resetInitiator = nil
     
@@ -264,7 +250,6 @@ function TurtleDungeonTimer:onSyncResetCancel(sender)
 end
 
 function TurtleDungeonTimer:onSyncResetExecute(sender)
-    print("[TDT] onSyncResetExecute from " .. sender)
     self:performResetSilent()
     
     self.resetVotes = {}
@@ -277,7 +262,6 @@ end
 -- RESET VOTE DIALOG
 -- ============================================================================
 function TurtleDungeonTimer:showResetVoteDialog(initiator)
-    print("[TDT] showResetVoteDialog for " .. initiator)
     if self.resetVoteDialog then
         self.resetVoteDialog:Hide()
     end
@@ -354,7 +338,6 @@ end
 -- HELPER FUNCTIONS
 -- ============================================================================
 function TurtleDungeonTimer:getGroupMemberCount()
-    print("[TDT] getGroupMemberCount")
     if GetNumRaidMembers() > 0 then
         return GetNumRaidMembers()
     elseif GetNumPartyMembers() > 0 then
@@ -364,7 +347,6 @@ function TurtleDungeonTimer:getGroupMemberCount()
 end
 
 function TurtleDungeonTimer:getGroupChannel()
-    print("[TDT] getGroupChannel")
     if GetNumRaidMembers() > 0 then
         return "RAID"
     elseif GetNumPartyMembers() > 0 then

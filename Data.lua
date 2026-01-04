@@ -222,7 +222,10 @@ TurtleDungeonTimer.DUNGEON_DATA = {
         isDungeon = true,
         variants = {
             ["Default"] = {
-                bosses = {"Highlord Omokk", "Shadow Hunter Vosh'gajin", "War Master Voone", "Mor Grayhoof", "Mother Smolderweb", "Urok Doomhowl", "Quartermaster Zigris", "Halycon", "Gizrul the Slavener", "Overlord Wyrmthalak"},
+                bosses = {
+                    "Highlord Omokk", 
+                    "Shadow Hunter Vosh'gajin", 
+                    "War Master Voone", "Mor Grayhoof", "Mother Smolderweb", "Urok Doomhowl", "Quartermaster Zigris", "Halycon", "Gizrul the Slavener", "Overlord Wyrmthalak"},
                 optionalBosses = {
                     ["Spirestone Butcher"] = true, -- Rare
                     ["Spirestone Battle Lord"] = true, -- Rare
