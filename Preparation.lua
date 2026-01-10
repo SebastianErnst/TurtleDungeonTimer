@@ -158,11 +158,12 @@ function TurtleDungeonTimer:onPreparationDungeonSelected(dungeonName)
         self.preparationDungeonDialog = nil
     end
     
-    -- Select the dungeon
-    self:selectDungeon(dungeonName)
+    -- Store dungeon selection but DON'T set it yet!
+    -- It will be set only after all players confirm ready
+    self.pendingDungeonSelection = dungeonName
     
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug] After selectDungeon, selectedDungeon is: " .. tostring(self.selectedDungeon), 0, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Stored pending dungeon selection: " .. tostring(dungeonName), 0, 1, 1)
     end
     
     -- Now start the actual preparation checks
@@ -368,12 +369,9 @@ function TurtleDungeonTimer:startReadyCheck()
     
     -- Broadcast ready check request with dungeon name to all group members
     local dungeonName = ""
-    if self.selectedDungeon then
-        -- Use dungeon key directly as name (DUNGEON_DATA uses dungeon name as key)
-        dungeonName = self.selectedDungeon
-        if self.selectedVariant and self.selectedVariant ~= "Normal" then
-            dungeonName = dungeonName .. " (" .. self.selectedVariant .. ")"
-        end
+    if self.pendingDungeonSelection then
+        -- Use pending dungeon selection (not yet set as selectedDungeon)
+        dungeonName = self.pendingDungeonSelection
     end
     -- Ensure dungeonName is never nil
     dungeonName = dungeonName or ""
@@ -457,7 +455,10 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName)
     yesBtn:SetPoint("RIGHT", frame, "BOTTOM", -10, 55)
     yesBtn:SetText("Ja")
     yesBtn:SetScript("OnClick", function()
-        TurtleDungeonTimer:getInstance():respondToReadyCheck(true)
+        local tdt = TurtleDungeonTimer:getInstance()
+        
+        -- Just respond to ready check, dungeon will be set later
+        tdt:respondToReadyCheck(true)
         frame:Hide()
     end)
     
@@ -629,6 +630,36 @@ function TurtleDungeonTimer:finishReadyCheck()
     
     if allReady then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r Alle sind ready!", 0, 1, 0)
+        
+        -- NOW set the dungeon for everyone (leader + all group members)
+        if self:isGroupLeader() and self.pendingDungeonSelection then
+            local dungeonKey = self.pendingDungeonSelection
+            local variantKey = nil
+            
+            -- Check if variant is in parentheses
+            local _, _, keyPart, variantPart = string.find(dungeonKey, "^(.+)%s*%((.+)%)$")
+            if keyPart and variantPart then
+                dungeonKey = keyPart
+                variantKey = variantPart
+            end
+            
+            if TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("[Debug] All ready - now setting dungeon for everyone: " .. dungeonKey .. (variantKey and (" (" .. variantKey .. ")") or ""), 0, 1, 1)
+            end
+            
+            -- Broadcast dungeon selection to all group members
+            local dungeonData = dungeonKey
+            if variantKey then
+                dungeonData = dungeonKey .. ";" .. variantKey
+            end
+            self:sendSyncMessage("SET_DUNGEON", dungeonData)
+            
+            -- Set dungeon locally for leader
+            self:selectDungeon(dungeonKey)
+            if variantKey then
+                self:selectVariant(variantKey)
+            end
+        end
         
         -- Reset current run directly and broadcast to group
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Setze aktuellen Run zurück...", 0, 1, 0)

@@ -485,33 +485,13 @@ end
 -- BOSS LIST (Collapsible with Scrollbar)
 -- ============================================================================
 function TurtleDungeonTimer:createBossList()
-    -- Container for boss list (scroll frame)
+    -- Container for boss list
     local bossContainer = CreateFrame("Frame", nil, self.frame)
     bossContainer:SetPoint("TOPLEFT", self.frame.progressBg, "BOTTOMLEFT", 0, -6)
     bossContainer:SetWidth(218)
     bossContainer:SetHeight(1) -- Will expand
     bossContainer:Hide()       -- Hidden by default
     self.frame.bossContainer = bossContainer
-
-    -- Scroll Frame with Template (like working example)
-    local scrollFrameName = "TDTBossScrollFrame" .. math.random(1, 999999)
-    local scrollFrame = CreateFrame("ScrollFrame", scrollFrameName, bossContainer, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetWidth(218)
-    scrollFrame:SetHeight(1) -- Will be set in expandBossList
-    scrollFrame:SetPoint("TOPLEFT", bossContainer, "TOPLEFT", 0, 0)
-    scrollFrame:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-    })
-    scrollFrame:SetBackdropColor(0.1, 0.8, 0.1, 0.8) -- GREEN for testing
-    self.frame.bossScrollFrame = scrollFrame
-
-    -- Scroll Child (content) - no backdrop needed
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(210) -- width - 8 for scrollbar
-    scrollChild:SetHeight(1)  -- Will be set based on content
-    scrollChild:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", 0, 0)
-    scrollFrame:SetScrollChild(scrollChild)
-    self.frame.bossScrollChild = scrollChild
 
     -- Will be populated when dungeon is selected
     self.frame.bossRows = {}
@@ -534,6 +514,8 @@ function TurtleDungeonTimer:expandBossList()
     if not self.frame.bossContainer then return end
 
     local bossCount = table.getn(self.bossList)
+    if bossCount == 0 then return end
+    
     local rowHeight = 23
     local totalContentHeight = bossCount * rowHeight
     local maxVisibleItems = 8 -- Max bosses visible before scrollbar
@@ -545,8 +527,6 @@ function TurtleDungeonTimer:expandBossList()
     -- Expand frame
     self.frame:SetHeight(115 + visibleHeight + 10)
     self.frame.bossContainer:SetHeight(visibleHeight)
-    self.frame.bossScrollFrame:SetHeight(visibleHeight)
-    self.frame.bossScrollChild:SetHeight(totalContentHeight)
 
     self.frame.bossContainer:Show()
 
@@ -581,11 +561,21 @@ function TurtleDungeonTimer:updateBossRows()
     local rowHeight = 23
     local bossCount = table.getn(self.bossList)
     
-    -- Debug output
-    DEFAULT_CHAT_FRAME:AddMessage("updateBossRows: bossCount = " .. tostring(bossCount), 1, 1, 0)
+    if bossCount == 0 then return end
+    
+    -- Check if we need to create new rows
+    local needsRecreate = false
+    if not self.frame.bossRows or table.getn(self.frame.bossRows) ~= bossCount then
+        needsRecreate = true
+    else
+        -- Check if first row is valid
+        if not self.frame.bossRows[1] or not self.frame.bossRows[1].name or not self.frame.bossRows[1].name.SetText then
+            needsRecreate = true
+        end
+    end
     
     -- Initialize bossRows if needed (only create once!)
-    if not self.frame.bossRows or table.getn(self.frame.bossRows) ~= bossCount then
+    if needsRecreate then
         -- Clean up old rows if count changed
         if self.frame.bossRows then
             for i = 1, table.getn(self.frame.bossRows) do
@@ -600,39 +590,44 @@ function TurtleDungeonTimer:updateBossRows()
             end
         end
         
-        -- Create new rows in scrollChild, not bossContainer!
+        -- Create new rows directly in bossContainer
         self.frame.bossRows = {}
         for i = 1, bossCount do
             local boss = self.bossList[i]
             local bossName = type(boss) == "table" and boss.name or boss
             
-            DEFAULT_CHAT_FRAME:AddMessage("Creating row " .. i .. ": " .. tostring(bossName), 0, 1, 1)
-            
-            -- Boss name (left)
-            local nameText = self.frame.bossScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            nameText:SetPoint("TOPLEFT", self.frame.bossScrollChild, "TOPLEFT", 8, -(i-1) * rowHeight - 5)
+            -- Boss name (left) - 3px more right (-2 -> 1)
+            local nameText = self.frame.bossContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameText:SetPoint("TOPLEFT", self.frame.bossContainer, "TOPLEFT", 1, -(i-1) * rowHeight - 5)
             nameText:SetText(bossName)
             nameText:SetJustifyH("LEFT")
             nameText:SetTextColor(1, 1, 1)
-            nameText:Show()  -- Explicitly show
             
-            DEFAULT_CHAT_FRAME:AddMessage("  nameText created: " .. tostring(nameText:GetText()), 0, 1, 0)
-            
-            -- Kill time (right)
-            local timeText = self.frame.bossScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            timeText:SetPoint("TOPRIGHT", self.frame.bossScrollChild, "TOPRIGHT", -10, -(i-1) * rowHeight - 5)
+            -- Kill time (right) - 30px more right (-35 -> -5)
+            local timeText = self.frame.bossContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            timeText:SetPoint("TOPRIGHT", self.frame.bossContainer, "TOPRIGHT", -5, -(i-1) * rowHeight - 5)
             timeText:SetText("--:--")
             timeText:SetJustifyH("RIGHT")
             timeText:SetTextColor(0.5, 0.5, 0.5)
-            timeText:Show()  -- Explicitly show
             
             self.frame.bossRows[i] = {name = nameText, time = timeText}
         end
-        
-        DEFAULT_CHAT_FRAME:AddMessage("Total rows created: " .. table.getn(self.frame.bossRows), 1, 1, 0)
+    else
+        -- Rows already exist with correct count - just show them!
+        for i = 1, bossCount do
+            if self.frame.bossRows[i] and self.frame.bossRows[i].name then
+                local nameText = self.frame.bossRows[i].name
+                local timeText = self.frame.bossRows[i].time
+                
+                if nameText and nameText.SetText then
+                    nameText:Show()
+                    timeText:Show()
+                end
+            end
+        end
     end
     
-    -- Update existing rows (colors and times only, no recreation!)
+    -- Update existing rows (colors and times only)
     for i = 1, bossCount do
         local boss = self.bossList[i]
         local defeated = type(boss) == "table" and boss.defeated or false
@@ -641,15 +636,18 @@ function TurtleDungeonTimer:updateBossRows()
         -- Skip if row doesn't exist or is incomplete
         if not row or not row.name or not row.time then
             -- Row is invalid, skip this one
-            -- Don't break - continue with next row
         else
-            -- Get kill time
+            -- Get kill time by searching through killTimes for matching boss index
             local killTime = nil
-            if self.killTimes[i] then
-                if type(self.killTimes[i]) == "table" then
-                    killTime = self.killTimes[i].time
-                else
-                    killTime = self.killTimes[i]
+            for j = 1, table.getn(self.killTimes) do
+                local killEntry = self.killTimes[j]
+                if type(killEntry) == "table" and killEntry.index == i then
+                    killTime = killEntry.time
+                    break
+                elseif type(killEntry) == "number" and j == i then
+                    -- Legacy format support (if killTimes uses direct indexing)
+                    killTime = killEntry
+                    break
                 end
             end
             

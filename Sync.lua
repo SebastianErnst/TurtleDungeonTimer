@@ -236,6 +236,8 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
         self:onSyncPreparationFailed(data, sender)
     elseif msgType == "DUNGEON_SELECTED" then
         self:onSyncDungeonSelected(data, sender)
+    elseif msgType == "SET_DUNGEON" then
+        self:onSyncSetDungeon(data, sender)
     elseif msgType == "READY_CHECK_START" then
         self:onSyncReadyCheckStart(data, sender)
     elseif msgType == "READY_CHECK_RESPONSE" then
@@ -521,8 +523,11 @@ function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
         DEFAULT_CHAT_FRAME:AddMessage("[Debug] Ready Check started by: " .. sender .. " with dungeon: " .. tostring(data), 1, 1, 0)
     end
     
-    -- data contains the dungeon name
+    -- data contains the dungeon name (just display name for now)
     local dungeonName = data or ""
+    
+    -- Store the dungeon name from leader (for later selection when clicking Yes)
+    self.pendingDungeonSelection = dungeonName
     
     -- Show ready check prompt to this player with the dungeon name
     self:showReadyCheckPrompt(dungeonName)
@@ -531,4 +536,32 @@ end
 function TurtleDungeonTimer:onSyncReadyCheckResponse(data, sender)
     -- Forward to preparation module
     self:onReadyCheckResponse(sender, data)
+end
+
+-- ============================================================================
+-- SET DUNGEON SYNCHRONIZATION (After Ready Check Success)
+-- ============================================================================
+
+function TurtleDungeonTimer:onSyncSetDungeon(data, sender)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Received SET_DUNGEON from " .. sender .. ": " .. tostring(data), 1, 1, 0)
+    end
+    
+    -- Parse dungeon data (format: "DungeonKey" or "DungeonKey;VariantKey")
+    local dungeonKey = data
+    local variantKey = nil
+    
+    local _, _, key, variant = string.find(data, "^([^;]+);(.+)$")
+    if key and variant then
+        dungeonKey = key
+        variantKey = variant
+    end
+    
+    -- Set the dungeon
+    self:selectDungeon(dungeonKey)
+    if variantKey then
+        self:selectVariant(variantKey)
+    end
+    
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Dungeon gesetzt: " .. dungeonKey .. (variantKey and (" (" .. variantKey .. ")") or ""), 0, 1, 0)
 end

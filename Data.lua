@@ -17,7 +17,20 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             ["Default"] = {
                 bosses = {"Aszosh Grimflame", "Tham'Grarr", "Black Bride", "Damian", "Volkan Cruelblade", "Arc'tiras"}
             }
-        }
+        },
+        trashMobs = {
+            {name = "Black Blood of the Dragonmaw", hp = 13115, count = 9},    -- 118035
+            {name = "Grellkin Scorcher", hp = 12378, count = 19},              -- 235182
+            {name = "Grellkin Sorcerer", hp = 12367, count = 17},              -- 210239
+            {name = "Maddened Vault Guard", hp = 12345, count = 13},           -- 160485
+            {name = "Manacrazed Grell", hp = 12298, count = 15},               -- 184470
+            {name = "Runic Construct", hp = 19898, count = 2},                 -- 39796
+            {name = "Shadow Creeper", hp = 16048, count = 12},                 -- 192576
+            {name = "Soulless Husk", hp = 13357, count = 15},                  -- 200355
+            {name = "Wicked Skitterer", hp = 13851, count = 13}                -- 180063
+        },
+        totalTrashHP = 1521201,  -- Total: 118035 + 235182 + 210239 + 160485 + 184470 + 39796 + 192576 + 200355 + 180063
+        trashRequiredPercent = 50  -- 80% required for completion
     },
     ["Stratholme"] = {
         isDungeon = true,

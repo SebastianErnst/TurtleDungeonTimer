@@ -656,6 +656,65 @@ local config = MyAddonConfig and MyAddonConfig.setting1 or defaultValue
 
 **Why this matters:** Lua executes files sequentially. If file A calls a function from file B, but B loads after A, the function doesn't exist yet. Always check your .toc load order!
 
+### FontString/Frame Reuse and Validation (CRITICAL!)
+
+**⚠️ COMMON BUG:** Caching FontStrings or Frames in tables and assuming they're still valid later!
+
+```lua
+-- ❌ WRONG - Only checking table length
+if not self.frame.bossRows or table.getn(self.frame.bossRows) ~= bossCount then
+    -- Create new rows
+    self.frame.bossRows = {}
+    for i = 1, bossCount do
+        local text = parent:CreateFontString(...)
+        self.frame.bossRows[i] = {name = text}
+    end
+end
+-- Problem: Table has correct length but entries might be NIL or invalid!
+
+-- ✅ CORRECT - Validate that cached UI elements are still valid
+local needsRecreate = false
+if not self.frame.bossRows or table.getn(self.frame.bossRows) ~= bossCount then
+    needsRecreate = true
+else
+    -- Check if first row is still valid
+    if not self.frame.bossRows[1] or 
+       not self.frame.bossRows[1].name or 
+       not self.frame.bossRows[1].name.SetText then
+        needsRecreate = true
+    end
+end
+
+if needsRecreate then
+    -- Create new rows
+    self.frame.bossRows = {}
+    for i = 1, bossCount do
+        local text = parent:CreateFontString(...)
+        self.frame.bossRows[i] = {name = text}
+    end
+else
+    -- Rows are valid, just show them (if they were hidden)
+    for i = 1, bossCount do
+        self.frame.bossRows[i].name:Show()
+    end
+end
+```
+
+**Why this happens:**
+- FontStrings/Frames can be destroyed or invalidated (e.g., parent hidden, frame recycled)
+- `Hide()` makes them invisible but they remain in your table
+- Table length (`table.getn()`) stays the same even if entries are NIL
+- Lua doesn't automatically clean up invalid references
+
+**When to validate:**
+- Before reusing cached UI elements after Hide/Show cycles
+- When parent frames are shown/hidden repeatedly
+- After dungeon/zone changes that might reset UI state
+- Any time you're unsure if cached frames are still valid
+
+**Best Practice:**
+Always validate that cached UI elements have their expected methods (e.g., `SetText`) before using them!
+
 ### Delayed/Scheduled Execution
 
 ```lua
