@@ -8,8 +8,6 @@ function TurtleDungeonTimer:registerEvents()
         self.eventFrame = CreateFrame("Frame")
         self.eventFrame:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
         self.eventFrame:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
-        self.eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-        self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
         self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
         -- Register party member combat events
         self.eventFrame:RegisterEvent("UNIT_COMBAT")
@@ -17,15 +15,14 @@ function TurtleDungeonTimer:registerEvents()
             if (event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" or event == "CHAT_MSG_COMBAT_FRIENDLY_DEATH") and arg1 then
                 TurtleDungeonTimer:getInstance():onCombatLog(arg1)
             elseif event == "PLAYER_REGEN_DISABLED" then
-                TurtleDungeonTimer:getInstance():onCombatStart()
+                -- Player entered combat - broadcast to group
+                TurtleDungeonTimer:getInstance():broadcastCombatStart()
             elseif event == "UNIT_COMBAT" then
                 -- Any unit in party/raid enters combat
                 local unit = arg1
                 if unit and (string.find(unit, "party") or string.find(unit, "raid") or unit == "player") then
-                    TurtleDungeonTimer:getInstance():onCombatStart()
+                    TurtleDungeonTimer:getInstance():broadcastCombatStart()
                 end
-            elseif event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_ENTERING_WORLD" then
-                TurtleDungeonTimer:getInstance():onZoneChanged()
             end
         end)
     end
@@ -36,7 +33,7 @@ function TurtleDungeonTimer:registerEvents()
         self.deathEventFrame:RegisterEvent("PLAYER_DEAD")
         self.deathEventFrame:SetScript("OnEvent", function()
             if event == "PLAYER_DEAD" then
-                TurtleDungeonTimer:getInstance():onDeath()
+                TurtleDungeonTimer:getInstance():broadcastDeath()
             end
         end)
     end
@@ -45,62 +42,44 @@ end
 function TurtleDungeonTimer:onCombatLog(msg)
     if not self.isRunning then return end
     
-    -- Extract name from death message using string.find (Lua 5.0 compatible)
-    -- Support both "X dies." and "X has died."
-    local _, _, name = string.find(msg, "(.+) dies%.")
-    if not name then
-        _, _, name = string.find(msg, "(.+) has died%.")
-    end
+    -- Only track kills made by the player
+    -- Pattern: "You have slain [Mob Name]!"
+    local _, _, name = string.find(msg, "You have slain (.+)!")
+    
     if not name then return end
     
-    -- Check if this is a group member death
-    local isGroupMemberDeath = false
-    local playerName = UnitName("player")
-    
-    -- Check if it's the player (but skip - handled by PLAYER_DEAD event)
-    if name == playerName then
-        -- Don't double-count own death, PLAYER_DEAD handles this
-        return
+    -- Debug output
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Player killed: " .. name)
     end
     
-    -- Check raid members
-    if GetNumRaidMembers() > 0 then
-        for i = 1, GetNumRaidMembers() do
-            local memberName = UnitName("raid" .. i)
-            if memberName and memberName == name then
-                isGroupMemberDeath = true
-                break
-            end
-        end
-    -- Check party members
-    elseif GetNumPartyMembers() > 0 then
-        for i = 1, GetNumPartyMembers() do
-            local memberName = UnitName("party" .. i)
-            if memberName and memberName == name then
-                isGroupMemberDeath = true
-                break
-            end
-        end
-    end
+    -- Broadcast the kill to the group
+    self:broadcastBossKill(name)
+    self:broadcastTrashKill(name)
     
-    -- If it's a group member death, count it
-    if isGroupMemberDeath then
-        self.deathCount = self.deathCount + 1
-        
-        -- Update death counter in UI
-        if self.frame and self.frame.deathText then
-            self.frame.deathText:SetText("Deaths: " .. self.deathCount)
-        end
-        
-        -- Save progress
-        self:saveLastRun()
-        
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. name .. " ist gestorben (Deaths: " .. self.deathCount .. ")", 1, 0.5, 0)
+    -- Also process locally (sender doesn't receive own addon messages)
+    self:onBossKilled(name)
+    if TDTTrashCounter then
+        TDTTrashCounter:onMobKilled(name)
     end
+end
+
+function TurtleDungeonTimer:onBossKilled(name)
+    if not self.isRunning then return end
     
     -- Check if this is one of our boss targets
     for i = 1, table.getn(self.bossList) do
-        if name == self.bossList[i] then
+        local boss = self.bossList[i]
+        local bossName = type(boss) == "table" and boss.name or boss
+        
+        -- Debug output
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Comparing '" .. name .. "' with boss " .. i .. ": '" .. bossName .. "'")
+        end
+        
+        if name == bossName then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[Turtle Dungeon Timer]|r Boss kill detected: " .. bossName)
+            
             -- Check if already killed
             local alreadyKilled = false
             for j = 1, table.getn(self.killTimes) do
@@ -121,11 +100,16 @@ function TurtleDungeonTimer:onCombatLog(msg)
                 end
                 
                 table.insert(self.killTimes, {
-                    bossName = name,
+                    bossName = bossName,
                     time = elapsed,
                     index = i,
                     splitTime = splitTime
                 })
+                
+                -- Mark boss as defeated if it's a table
+                if type(boss) == "table" then
+                    boss.defeated = true
+                end
                 
                 -- Update UI
                 self:updateBossRow(i, elapsed, splitTime)
@@ -143,7 +127,18 @@ function TurtleDungeonTimer:onCombatLog(msg)
     end
 end
 
-function TurtleDungeonTimer:onDeath()
+function TurtleDungeonTimer:broadcastDeath()
+    -- Get player name
+    local playerName = UnitName("player")
+    
+    -- Broadcast death to group
+    self:broadcastPlayerDeath(playerName)
+    
+    -- Also process locally (sender doesn't receive own addon messages)
+    self:onPlayerDeath(playerName)
+end
+
+function TurtleDungeonTimer:onPlayerDeath(playerName)
     -- Auto-start timer if not running but dungeon is selected
     if not self.isRunning and self.selectedDungeon and self.selectedVariant then
         -- Start timer automatically on first death
@@ -156,11 +151,28 @@ function TurtleDungeonTimer:onDeath()
     
     -- Update death counter in UI
     if self.frame and self.frame.deathText then
-        self.frame.deathText:SetText("Deaths: " .. self.deathCount)
+        self.frame.deathText:SetText("" .. self.deathCount)
     end
     
     -- Save progress
     self:saveLastRun()
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Player death counted: " .. playerName)
+    end
+end
+
+function TurtleDungeonTimer:broadcastCombatStart()
+    -- Only broadcast if timer is not already running
+    if self.isRunning then
+        return  -- Timer already running, no need to broadcast
+    end
+    
+    -- Broadcast combat start to group
+    self:broadcastTimerStart()
+    
+    -- Also process locally (sender doesn't receive own addon messages)
+    self:onCombatStart()
 end
 
 function TurtleDungeonTimer:onCombatStart()
@@ -168,62 +180,33 @@ function TurtleDungeonTimer:onCombatStart()
     -- 1. Timer is not already running
     -- 2. We have a dungeon selected
     if not self.isRunning and self.selectedDungeon and self.selectedVariant then
-        -- Simply start without zone check - user selected the dungeon, so trust them
         self:start()
     end
 end
 
-function TurtleDungeonTimer:onZoneChanged()
-    local zoneName = GetRealZoneText()
-    local subZoneName = GetSubZoneText()
-    
-    -- Timer läuft weiter, auch wenn man die Zone verlässt (z.B. beim Tod)
-    -- Der Spieler muss den Timer manuell stoppen mit STOP oder RESET
-    
-    -- Try to match zone or subzone with dungeon names
-    for dungeonName, dungeonData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
-        if dungeonName ~= "!Test Mode" and not dungeonData.isHeader then
-            -- Check if zone or subzone matches dungeon name
-            if zoneName == dungeonName or subZoneName == dungeonName then
-                -- Only auto-select if no dungeon is currently selected or different dungeon
-                if not self.selectedDungeon or self.selectedDungeon ~= dungeonName then
-                    self:selectDungeon(dungeonName)
-                    -- Show the frame
-                    if self.frame and not self.frame:IsVisible() then
-                        self.frame:Show()
-                        TurtleDungeonTimerDB.visible = true
-                    end
-                    -- Send chat message
-                    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. dungeonName .. " erkannt. Timer startet beim ersten Kampf!", 1, 1, 0)
-                end
-                return
-            end
-            
-            -- Also check partial matches for some dungeons
-            -- (e.g. "Blackrock Depths" zone might be "Blackrock Mountain")
-            if string.find(zoneName, dungeonName) or string.find(dungeonName, zoneName) then
-                if string.len(zoneName) > 5 and string.len(dungeonName) > 5 then
-                    -- Only auto-select if no dungeon is currently selected or different dungeon
-                    if not self.selectedDungeon or self.selectedDungeon ~= dungeonName then
-                        self:selectDungeon(dungeonName)
-                        -- Show the frame
-                        if self.frame and not self.frame:IsVisible() then
-                            self.frame:Show()
-                            TurtleDungeonTimerDB.visible = true
-                        end
-                        -- Send chat message
-                        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. dungeonName .. " erkannt. Timer startet beim ersten Kampf!", 1, 1, 0)
-                    end
-                    return
-                end
-            end
+function TurtleDungeonTimer:onAllBossesDefeated()
+    -- Check if trash requirement is also met (if dungeon has trash data)
+    local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon]
+    if dungeonData and dungeonData.trashMobs then
+        if not TDTTrashCounter:isTrashComplete() then
+            -- Bosse sind tot, aber Trash nicht komplett
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Alle Bosse besiegt! Trash noch nicht komplett.", 1, 1, 0)
+            return  -- Timer läuft weiter
         end
     end
-end
-
-function TurtleDungeonTimer:onAllBossesDefeated()
+    
+    -- Alle Bosse + Trash (falls vorhanden) sind komplett
     self.isRunning = false
     local finalTime = GetTime() - self.startTime
+    
+    -- Force progress bar to 100%
+    if self.frame and self.frame.progressBar and self.frame.progressText then
+        self.frame.progressBar:SetWidth(218)
+        self.frame.progressText:SetText("100%")
+    end
+    
+    -- Broadcast timer completion to group
+    self:broadcastTimerComplete(finalTime)
     
     self:saveBestTime(finalTime)
     self:saveLastRun()
@@ -239,6 +222,69 @@ function TurtleDungeonTimer:onAllBossesDefeated()
     if self.frame and self.frame.dungeonNameText then
         self.frame.dungeonNameText:SetTextColor(0, 1, 0)
     end
+    
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r |cFF00FF00Run komplett! Alle Bosse + Trash besiegt!|r", 1, 1, 0)
+end
+
+function TurtleDungeonTimer:showDungeonSwitchDialog(newDungeonName)
+    -- Create confirmation dialog
+    local dialog = CreateFrame("Frame", nil, UIParent)
+    dialog:SetWidth(350)
+    dialog:SetHeight(150)
+    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+    dialog:SetBackdropColor(0, 0, 0, 0.95)
+    dialog:SetFrameStrata("DIALOG")
+    
+    -- Title
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", dialog, "TOP", 0, -15)
+    title:SetText("Neuer Dungeon erkannt")
+    title:SetTextColor(1, 0.82, 0)
+    
+    -- Message
+    local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    message:SetPoint("TOP", title, "BOTTOM", 0, -10)
+    message:SetWidth(310)
+    message:SetText("Du betrittst " .. newDungeonName .. ".\n\nAktuellen Run resetten?")
+    message:SetJustifyH("CENTER")
+    
+    -- Yes Button
+    local yesButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    yesButton:SetWidth(100)
+    yesButton:SetHeight(30)
+    yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
+    yesButton:SetText("Ja")
+    yesButton:SetScript("OnClick", function()
+        dialog:Hide()
+        local timer = TurtleDungeonTimer:getInstance()
+        timer:performResetSilent()
+        timer:selectDungeon(newDungeonName)
+        if timer.frame and not timer.frame:IsVisible() then
+            timer.frame:Show()
+            TurtleDungeonTimerDB.visible = true
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. newDungeonName .. " ausgewählt. Timer startet beim ersten Kampf!", 1, 1, 0)
+    end)
+    
+    -- No Button
+    local noButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    noButton:SetWidth(100)
+    noButton:SetHeight(30)
+    noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
+    noButton:SetText("Nein")
+    noButton:SetScript("OnClick", function()
+        dialog:Hide()
+    end)
+    
+    dialog:Show()
 end
 
 function TurtleDungeonTimer:showExportBeforeResetDialog()
@@ -291,39 +337,23 @@ function TurtleDungeonTimer:updateBossRow(index, elapsed, splitTime)
         return
     end
     
-    -- Find the boss row by index (which corresponds to the original bossList)
-    local bossName = self.bossList[index]
-    local rowIndex = nil
-    
-    -- Find which row has this boss
-    for i = 1, table.getn(self.frame.bossRows) do
-        if self.frame.bossRows[i].bossName == bossName then
-            rowIndex = i
-            break
-        end
-    end
-    
-    if not rowIndex or not self.frame.bossRows[rowIndex] then
+    -- Don't update if list is collapsed
+    if not self.bossListExpanded then
         return
     end
     
-    local timeStr = self:formatTime(elapsed)
-    if TurtleDungeonTimerDB.settings.showSplits and splitTime > 0 then
-        timeStr = timeStr .. " (+" .. self:formatTime(splitTime) .. ")"
+    -- Direct index access (new UI has bossRows matching bossList order)
+    local row = self.frame.bossRows[index]
+    if not row or not row.time then
+        return
     end
     
-    self.frame.bossRows[rowIndex].timeText:SetText(timeStr)
+    -- Update kill time
+    local minutes = math.floor(elapsed / 60)
+    local seconds = elapsed - (minutes * 60)
+    row.time:SetText(string.format("%02d:%02d", minutes, seconds))
     
-    -- Optional bosses get a different color when killed
-    local isOptional = self.optionalBosses[bossName]
-    
-    if isOptional then
-        self.frame.bossRows[rowIndex]:SetBackdropColor(0.1, 0.3, 0.4, 0.8) -- Blueish for optional
-    else
-        self.frame.bossRows[rowIndex]:SetBackdropColor(0.1, 0.5, 0.1, 0.8) -- Green for required
-    end
-    
-    if self.frame.bossRows[rowIndex].checkmark then
-        self.frame.bossRows[rowIndex].checkmark:Show()
-    end
+    -- Update colors to green for defeated
+    row.name:SetTextColor(0.8, 1, 0.8)
+    row.time:SetTextColor(0.8, 1, 0.8)
 end

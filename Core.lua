@@ -45,6 +45,11 @@ function TurtleDungeonTimer:new()
     self.minimized = false
     self.initialized = false
     
+    -- World buff tracking
+    self.hasWorldBuffs = false
+    self.hasCheckedWorldBuffs = false
+    self.worldBuffPlayers = {}
+    
     -- Initialize database
     self:initializeDatabase()
     
@@ -168,6 +173,12 @@ function TurtleDungeonTimer:initialize()
     self:initializeSync()
     self:createMinimapButton()
     
+    -- Initialize trash scanner
+    TDTTrashScanner:initialize()
+    
+    -- Initialize trash counter
+    TDTTrashCounter:initialize()
+    
     -- Load last selection
     if TurtleDungeonTimerDB.lastSelection.dungeon then
         self:selectDungeon(TurtleDungeonTimerDB.lastSelection.dungeon)
@@ -229,7 +240,9 @@ function TurtleDungeonTimer:saveLastRun()
         startTime = self.startTime,
         playerName = self.playerName,
         guildName = self.guildName,
-        groupClasses = self.groupClasses
+        groupClasses = self.groupClasses,
+        hasWorldBuffs = self.hasWorldBuffs or false,
+        worldBuffPlayers = self.worldBuffPlayers or {}
     }
 end
 
@@ -237,6 +250,7 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
     if not self.selectedDungeon or not self.selectedVariant then return end
     
     local historyEntry = {
+        uuid = self.currentRunUUID or self:generateUUID(),
         dungeon = self.selectedDungeon,
         variant = self.selectedVariant,
         time = finalTime,
@@ -247,7 +261,9 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
         completed = completed or false,
         playerName = self.playerName or "Unknown",
         guildName = self.guildName or "No Guild",
-        groupClasses = self.groupClasses or {}
+        groupClasses = self.groupClasses or {},
+        hasWorldBuffs = self.hasWorldBuffs or false,
+        worldBuffPlayers = self.worldBuffPlayers or {}
     }
     
     -- Add to beginning of history
@@ -270,12 +286,14 @@ function TurtleDungeonTimer:restoreLastRun()
         self.playerName = lastRun.playerName
         self.guildName = lastRun.guildName
         self.groupClasses = lastRun.groupClasses
+        self.hasWorldBuffs = lastRun.hasWorldBuffs or false
+        self.worldBuffPlayers = lastRun.worldBuffPlayers or {}
         
         -- Update UI with saved data
         if self.frame then
             -- Update death counter
             if self.frame.deathText then
-                self.frame.deathText:SetText("Deaths: " .. self.deathCount)
+                self.frame.deathText:SetText("" .. self.deathCount)
             end
             
             -- Update total time from last kill

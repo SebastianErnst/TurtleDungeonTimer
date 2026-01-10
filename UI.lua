@@ -1,9 +1,9 @@
 -- ============================================================================
--- Turtle Dungeon Timer - User Interface
+-- Turtle Dungeon Timer - New UI (Based on Mockup)
 -- ============================================================================
 
 -- ============================================================================
--- UI ELEMENT CREATION UTILITIES
+-- DROPDOWN/MENU HELPER FUNCTIONS
 -- ============================================================================
 function TurtleDungeonTimer:CreateTDTButton(parent, text, width, height, onClick)
     local btn = CreateFrame("Button", nil, parent)
@@ -71,7 +71,7 @@ function TurtleDungeonTimer:CreateTDTScrollbar(scrollFrame, contentHeight, frame
     scrollbar:SetScript("OnValueChanged", function()
         scrollFrame:SetVerticalScroll(this:GetValue())
     end)
-    scrollFrame:EnableMouseWheel(true)
+    scrollFrame:EnableMouseWheel()
     scrollFrame:SetScript("OnMouseWheel", function()
         local delta = arg1
         local current = scrollbar:GetValue()
@@ -91,7 +91,9 @@ end
 function TurtleDungeonTimer:getRequiredBossCount()
     local count = 0
     for i = 1, table.getn(self.bossList) do
-        if not self.optionalBosses[self.bossList[i]] then
+        local boss = self.bossList[i]
+        local bossName = type(boss) == "table" and boss.name or boss
+        if not self.optionalBosses[bossName] then
             count = count + 1
         end
     end
@@ -116,28 +118,35 @@ function TurtleDungeonTimer:selectDungeon(dungeonName)
     if not dungeonName or dungeonName == "" then
         return
     end
-    
+
     -- Check if dungeon exists in data
     if not TurtleDungeonTimer.DUNGEON_DATA[dungeonName] then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage(
+            "[Debug] selectDungeon: Dungeon not found in DUNGEON_DATA: " .. tostring(dungeonName), 1, 0, 0)
+        end
         return
     end
-    
+
     self.selectedDungeon = dungeonName
     self.selectedVariant = nil
     self.bossList = {}
-    
-    if self.frame and self.frame.dungeonSelector then
-        self.frame.dungeonSelector:SetText(tostring(dungeonName))
+
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] selectDungeon: Set selectedDungeon to: " .. tostring(dungeonName), 0, 1, 0)
     end
-    
+
+    -- Broadcast dungeon selection
+    self:broadcastDungeonSelected(dungeonName)
+
     TurtleDungeonTimerDB.lastSelection.dungeon = dungeonName
-    
+
     -- Auto-select variant if only one exists or if "Default" exists
     local variants = TurtleDungeonTimer.DUNGEON_DATA[dungeonName].variants
     local variantCount = 0
     local firstVariant = nil
     local hasDefault = false
-    
+
     for variantName, _ in pairs(variants) do
         variantCount = variantCount + 1
         if not firstVariant then
@@ -147,14 +156,15 @@ function TurtleDungeonTimer:selectDungeon(dungeonName)
             hasDefault = true
         end
     end
-    
+
     if hasDefault then
         self:selectVariant("Default")
     elseif variantCount == 1 then
         self:selectVariant(firstVariant)
     else
+        -- No auto-select
+        TDTTrashCounter:hideTrashBar()
         self:rebuildBossRows()
-        self:updateBestTimeDisplay()
     end
 end
 
@@ -165,25 +175,28 @@ function TurtleDungeonTimer:selectVariant(variantName)
     if not variantName or variantName == "" then
         return
     end
-    
+
     self.selectedVariant = variantName
     local variantData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon].variants[variantName]
     if not variantData then
         return
     end
-    
-    self.bossList = variantData.bosses
-    self.optionalBosses = variantData.optionalBosses or {}
-    
-    -- Update both selector and header text
-    if self.frame and self.frame.dungeonSelector then
-        if variantName == "Default" then
-            self.frame.dungeonSelector:SetText(tostring(self.selectedDungeon))
-        else
-            self.frame.dungeonSelector:SetText(tostring(self.selectedDungeon) .. " - " .. tostring(variantName))
+
+    -- Build boss list with proper structure
+    self.bossList = {}
+    if variantData.bosses then
+        for i = 1, table.getn(variantData.bosses) do
+            table.insert(self.bossList, {
+                name = variantData.bosses[i],
+                defeated = false,
+                optional = false
+            })
         end
     end
-    
+
+    self.optionalBosses = variantData.optionalBosses or {}
+
+    -- Update dungeon name text
     if self.frame and self.frame.dungeonNameText then
         local displayName = self.selectedDungeon
         if variantName ~= "Default" then
@@ -192,42 +205,50 @@ function TurtleDungeonTimer:selectVariant(variantName)
         self.frame.dungeonNameText:SetText(displayName)
         self.frame.dungeonNameText:SetTextColor(1, 0.82, 0)
     end
-    
+
     TurtleDungeonTimerDB.lastSelection.variant = variantName
-    
+
+    -- Prepare trash counter bar
+    TDTTrashCounter:prepareDungeon(self.selectedDungeon)
+
+    -- Rebuild boss list
     self:rebuildBossRows()
-    self:updateBestTimeDisplay()
 end
 
 -- ============================================================================
--- UI CREATION
+-- MAIN UI CREATION
 -- ============================================================================
 function TurtleDungeonTimer:createUI()
     if self.frame then return end
-    
+
+    -- Main Frame
     self.frame = CreateFrame("Frame", "TurtleDungeonTimerFrame", UIParent)
-    self.frame:SetWidth(270)
-    self.frame:SetHeight(250)
-    
+    self.frame:SetWidth(248)
+    self.frame:SetHeight(115) -- Collapsed height (same as collapseBossList)
+
     -- Restore saved position or use default
     local pos = TurtleDungeonTimerDB.position
     self.frame:SetPoint(pos.point, UIParent, pos.relativePoint, pos.xOfs, pos.yOfs)
-    
+
+    -- Background
     self.frame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true,
-        tileSize = 32,
-        edgeSize = 32,
-        insets = {left = 11, right = 12, top = 12, bottom = 11}
+        tileSize = 16,
+        edgeSize = 16,
+        insets = { left = 5, right = 5, top = 5, bottom = 5 }
     })
+    self.frame:SetBackdropColor(0, 0, 0, 0.5)
+    self.frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 1)
+
+    -- Make movable
     self.frame:SetMovable(true)
     self.frame:EnableMouse(true)
     self.frame:RegisterForDrag("LeftButton")
     self.frame:SetScript("OnDragStart", function() this:StartMoving() end)
     self.frame:SetScript("OnDragStop", function()
         this:StopMovingOrSizing()
-        -- Save position
         local point, relativeTo, relativePoint, xOfs, yOfs = this:GetPoint()
         TurtleDungeonTimerDB.position = {
             point = point,
@@ -237,247 +258,694 @@ function TurtleDungeonTimer:createUI()
             yOfs = yOfs
         }
     end)
-    
-    self:createDungeonSelector()
-    self:createButtons()
+
+    -- Create UI sections
     self:createHeader()
-    self:createMinimizeButton()
-    
-    self.frame.bossRows = {}
-    self:updateFrameSize()
+    self:createTimerRow()
+    self:createProgressBar()
+    self:createBossList()
+
+    -- Initialize state
+    self.bossListExpanded = false
+
     self.frame:Hide()
 end
 
-function TurtleDungeonTimer:createDungeonSelector()
-    -- Label
-    local dungeonLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    dungeonLabel:SetPoint("TOP", self.frame, "TOP", 0, -20)
-    dungeonLabel:SetText("Dungeon/Raid:")
-    self.frame.dungeonLabel = dungeonLabel
-    
-    -- Selector Button
-    local dungeonSelector = CreateFrame("Button", nil, self.frame, "GameMenuButtonTemplate")
-    dungeonSelector:SetWidth(240)
-    dungeonSelector:SetHeight(25)
-    dungeonSelector:SetPoint("TOP", dungeonLabel, "BOTTOM", 0, -5)
-    dungeonSelector:SetText("Select Dungeon...")
-    dungeonSelector:SetScript("OnClick", function() 
-        TurtleDungeonTimer:getInstance():showDungeonMenu(this) 
+-- ============================================================================
+-- HEADER (Dungeon Name + Buttons)
+-- ============================================================================
+function TurtleDungeonTimer:createHeader()
+    -- Dungeon name text
+    local dungeonName = self.frame:CreateFontString(nil, "OVERLAY")
+    dungeonName:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 15, -15)
+    dungeonName:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    dungeonName:SetTextColor(1, 1, 1)
+    dungeonName:SetText("Select Dungeon...")
+    dungeonName:SetJustifyH("LEFT")
+    dungeonName:SetWidth(145)
+    self.frame.dungeonNameText = dungeonName
+
+    -- Make dungeon name clickable to open selector (limited width to not overlap buttons)
+    local dungeonNameButton = CreateFrame("Button", nil, self.frame)
+    dungeonNameButton:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 15, -15)
+    dungeonNameButton:SetWidth(145)
+    dungeonNameButton:SetHeight(20)
+    dungeonNameButton:SetScript("OnClick", function()
+        TurtleDungeonTimer:getInstance():showDungeonMenu(this)
     end)
-    self.frame.dungeonSelector = dungeonSelector
-end
 
-function TurtleDungeonTimer:createButtons()
-    local btnWidth = 56
-    local spacing = 3
+    -- Start/Reset Button (red button with text)
+    local startBtn = CreateFrame("Button", nil, self.frame)
+    startBtn:SetWidth(46)
+    startBtn:SetHeight(23)
+    startBtn:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 15, 10)
     
-    -- Calculate total width: 4 buttons * 42 + 3 gaps * 3 = 168 + 9 = 177px (zentriert in Frame)
-    
-    -- All buttons in one row: RESET, REPORT, EXPORT, HISTORY
-    self:createResetButton(btnWidth, spacing)
-    self:createReportButton(btnWidth, spacing)
-    self:createExportButton(btnWidth, spacing)
-    self:createHistoryButton(btnWidth, spacing)
-end
-
-function TurtleDungeonTimer:createResetButton(btnWidth, spacing)
-    local resetButton = CreateFrame("Button", nil, self.frame, "GameMenuButtonTemplate")
-    resetButton:SetWidth(btnWidth)
-    resetButton:SetHeight(30)
-    resetButton:SetText("RESET")
-    resetButton:SetScript("OnClick", function()
-        TurtleDungeonTimer:getInstance():reset()
-    end)
-    self.frame.resetButton = resetButton
-end
-
-function TurtleDungeonTimer:createReportButton(btnWidth, spacing)
-    local reportButton = CreateFrame("Button", nil, self.frame, "GameMenuButtonTemplate")
-    reportButton:SetWidth(btnWidth)
-    reportButton:SetHeight(30)
-    reportButton:SetText("REPORT")
-    self.frame.reportButton = reportButton
-    
-    local reportDropdown = CreateFrame("Frame", nil, reportButton)
-    reportDropdown:SetWidth(100)
-    reportDropdown:SetHeight(80)
-    reportDropdown:SetPoint("TOP", reportButton, "BOTTOM", 0, 0)
-    reportDropdown:SetBackdrop({
+    -- Red button backdrop
+    startBtn:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true,
         tileSize = 16,
-        edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
+        edgeSize = 12,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
     })
-    reportDropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    reportDropdown:SetFrameStrata("DIALOG")
-    reportDropdown:Hide()
-    self.frame.reportDropdown = reportDropdown
+    startBtn:SetBackdropColor(0.8, 0.1, 0.1, 1)
+    startBtn:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     
-    local channels = {{"SAY", "Say"}, {"PARTY", "Party"}, {"RAID", "Raid"}, {"GUILD", "Guild"}}
-    for i, channelData in ipairs(channels) do
-        local chatType = channelData[1]
-        local chatLabel = channelData[2]
+    -- Button text
+    local startBtnText = startBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    startBtnText:SetPoint("CENTER", startBtn, "CENTER", 0, 0)
+    startBtnText:SetText("Start")
+    startBtnText:SetTextColor(1, 1, 1)
+    startBtn.text = startBtnText
+
+    startBtn:SetScript("OnClick", function()
+        local timer = TurtleDungeonTimer:getInstance()
+
+        -- If running, toggle pause
+        if timer.isRunning then
+            timer:toggleStartPause()
+            return
+        end
+
+        -- If group leader and not running, start preparation
+        if timer:isGroupLeader() then
+            timer:startPreparation()
+        else
+            DEFAULT_CHAT_FRAME:AddMessage(
+            "|cffff0000[Turtle Dungeon Timer]|r Nur der Gruppenführer kann den Run starten!", 1, 0, 0)
+        end
+    end)
+
+    -- Tooltip
+    startBtn:SetScript("OnEnter", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+
+        if timer.isRunning then
+            GameTooltip:SetText("Timer stoppen", 1, 0.82, 0)
+        else
+            GameTooltip:SetText("Run vorbereiten", 1, 0.82, 0)
+            if timer:isGroupLeader() then
+                GameTooltip:AddLine("Startet einen frischen Run mit Dungeon-Reset.", 1, 1, 1, 1)
+                GameTooltip:AddLine(" ", 1, 1, 1, 1)
+                GameTooltip:AddLine("Requirements:", 0.8, 0.8, 0.8, 1)
+                GameTooltip:AddLine("- Alle haben das Addon (gleiche Version)", 1, 1, 1, 1)
+                GameTooltip:AddLine("- Niemand darf im Dungeon sein", 1, 1, 1, 1)
+            else
+                GameTooltip:AddLine("Nur der Gruppenführer kann den Run starten", 1, 0.5, 0.5, 1)
+            end
+        end
+        GameTooltip:Show()
+    end)
+    startBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    self.frame.startButton = startBtn
+
+    -- History Button (Settings/Gear icon)
+    local historyBtn = CreateFrame("Button", nil, self.frame)
+    historyBtn:SetWidth(20)
+    historyBtn:SetHeight(20)
+    historyBtn:SetPoint("LEFT", startBtn, "RIGHT", 5, 0)
+
+    historyBtn.icon = historyBtn:CreateTexture(nil, "ARTWORK")
+    historyBtn.icon:SetAllPoints(historyBtn)
+    historyBtn.icon:SetTexture("Interface\\Icons\\INV_Misc_Book_02") -- Gear icon
+
+    historyBtn:SetScript("OnClick", function()
+        TurtleDungeonTimer:getInstance():showHistoryMenu(this)
+    end)
+    
+    -- Tooltip
+    historyBtn:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Run-Historie", 1, 0.82, 0)
+        GameTooltip:AddLine("Zeigt vergangene Runs und Bestzeiten", 1, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    historyBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    
+    self.frame.historyButton = historyBtn
+end
+
+-- ============================================================================
+-- TIMER ROW (Timer + Death Count)
+-- ============================================================================
+function TurtleDungeonTimer:createTimerRow()
+    -- Timer text (left)
+    local timerText = self.frame:CreateFontString(nil, "OVERLAY")
+    timerText:SetPoint("TOPLEFT", self.frame.dungeonNameText, "BOTTOMLEFT", 0, -6)
+    timerText:SetFont("Fonts\\FRIZQT__.TTF", 17, "OUTLINE")
+    timerText:SetTextColor(1, 1, 1)
+    timerText:SetText("00:00")
+    timerText:SetJustifyH("LEFT")
+    self.frame.timerText = timerText
+
+    -- Death count (right side)
+    -- Skull icon
+    local skullIcon = self.frame:CreateTexture(nil, "ARTWORK")
+    skullIcon:SetWidth(17)
+    skullIcon:SetHeight(17)
+    skullIcon:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -14, -34)
+    skullIcon:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Skull") -- Skull icon
+    self.frame.skullIcon = skullIcon
+
+    -- Death count text (X before skull)
+    local deathText = self.frame:CreateFontString(nil, "OVERLAY")
+    deathText:SetPoint("RIGHT", skullIcon, "LEFT", -2, 0)
+    deathText:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    deathText:SetTextColor(1, 1, 0)
+    deathText:SetText("0")
+    deathText:SetJustifyH("RIGHT")
+    self.frame.deathText = deathText
+end
+
+-- ============================================================================
+-- PROGRESS BAR
+-- ============================================================================
+function TurtleDungeonTimer:createProgressBar()
+    -- Background
+    local progressBg = self.frame:CreateTexture(nil, "BACKGROUND")
+    progressBg:SetPoint("TOPLEFT", self.frame.timerText, "BOTTOMLEFT", 0, -6)
+    progressBg:SetWidth(218)
+    progressBg:SetHeight(21)
+    progressBg:SetTexture(0.3, 0.3, 0.3, 0.9)
+    self.frame.progressBg = progressBg
+
+    -- Bar (cyan color like mockup)
+    local progressBar = self.frame:CreateTexture(nil, "ARTWORK")
+    progressBar:SetPoint("LEFT", progressBg, "LEFT", 0, 0)
+    progressBar:SetWidth(1)                    -- Will be updated
+    progressBar:SetHeight(21)
+    progressBar:SetTexture(0.3, 0.8, 0.9, 0.8) -- Cyan
+    self.frame.progressBar = progressBar
+
+    -- Percentage text
+    local progressText = self.frame:CreateFontString(nil, "OVERLAY")
+    progressText:SetPoint("CENTER", progressBg, "CENTER", 0, 0)
+    progressText:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+    progressText:SetTextColor(1, 1, 1)
+    progressText:SetText("0%")
+    self.frame.progressText = progressText
+
+    -- Collapse/Expand button (arrow)
+    local toggleBtn = CreateFrame("Button", nil, self.frame)
+    toggleBtn:SetWidth(30)
+    toggleBtn:SetHeight(16)
+    toggleBtn:SetPoint("TOPRIGHT", progressBg, "BOTTOMRIGHT", 5, -11)
+
+    toggleBtn.arrow = toggleBtn:CreateTexture(nil, "ARTWORK")
+    toggleBtn.arrow:SetWidth(20)
+    toggleBtn.arrow:SetHeight(20)
+    toggleBtn.arrow:SetPoint("CENTER", toggleBtn, "CENTER", 0, 0)
+    toggleBtn.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+
+    toggleBtn:SetScript("OnClick", function()
+        TurtleDungeonTimer:getInstance():toggleBossList()
+    end)
+    self.frame.toggleButton = toggleBtn
+
+    -- Add OnUpdate handler for automatic UI refresh
+    self.frame:SetScript("OnUpdate", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        if arg1 then -- arg1 = elapsed time
+            -- Update UI every frame while timer is running
+            if timer.isRunning then
+                timer:updateUI()
+            end
+        end
+    end)
+end
+
+-- ============================================================================
+-- BOSS LIST (Collapsible with Scrollbar)
+-- ============================================================================
+function TurtleDungeonTimer:createBossList()
+    -- Container for boss list (scroll frame)
+    local bossContainer = CreateFrame("Frame", nil, self.frame)
+    bossContainer:SetPoint("TOPLEFT", self.frame.progressBg, "BOTTOMLEFT", 0, -6)
+    bossContainer:SetWidth(218)
+    bossContainer:SetHeight(1) -- Will expand
+    bossContainer:Hide()       -- Hidden by default
+    self.frame.bossContainer = bossContainer
+
+    -- Scroll Frame with Template (like working example)
+    local scrollFrameName = "TDTBossScrollFrame" .. math.random(1, 999999)
+    local scrollFrame = CreateFrame("ScrollFrame", scrollFrameName, bossContainer, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetWidth(218)
+    scrollFrame:SetHeight(1) -- Will be set in expandBossList
+    scrollFrame:SetPoint("TOPLEFT", bossContainer, "TOPLEFT", 0, 0)
+    scrollFrame:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    })
+    scrollFrame:SetBackdropColor(0.1, 0.8, 0.1, 0.8) -- GREEN for testing
+    self.frame.bossScrollFrame = scrollFrame
+
+    -- Scroll Child (content) - no backdrop needed
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(210) -- width - 8 for scrollbar
+    scrollChild:SetHeight(1)  -- Will be set based on content
+    scrollChild:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", 0, 0)
+    scrollFrame:SetScrollChild(scrollChild)
+    self.frame.bossScrollChild = scrollChild
+
+    -- Will be populated when dungeon is selected
+    self.frame.bossRows = {}
+end
+
+-- ============================================================================
+-- BOSS LIST MANAGEMENT
+-- ============================================================================
+function TurtleDungeonTimer:toggleBossList()
+    self.bossListExpanded = not self.bossListExpanded
+
+    if self.bossListExpanded then
+        self:expandBossList()
+    else
+        self:collapseBossList()
+    end
+end
+
+function TurtleDungeonTimer:expandBossList()
+    if not self.frame.bossContainer then return end
+
+    local bossCount = table.getn(self.bossList)
+    local rowHeight = 23
+    local totalContentHeight = bossCount * rowHeight
+    local maxVisibleItems = 8 -- Max bosses visible before scrollbar
+    local maxVisibleHeight = maxVisibleItems * rowHeight
+
+    -- Calculate visible height
+    local visibleHeight = math.min(totalContentHeight, maxVisibleHeight)
+
+    -- Expand frame
+    self.frame:SetHeight(115 + visibleHeight + 10)
+    self.frame.bossContainer:SetHeight(visibleHeight)
+    self.frame.bossScrollFrame:SetHeight(visibleHeight)
+    self.frame.bossScrollChild:SetHeight(totalContentHeight)
+
+    self.frame.bossContainer:Show()
+
+    -- Update arrow direction (up) and position
+    self.frame.toggleButton.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up")
+    self.frame.toggleButton:ClearAllPoints()
+    self.frame.toggleButton:SetPoint("TOPRIGHT", self.frame.bossContainer, "BOTTOMRIGHT", 5, -8)
+
+    -- Create/update boss rows
+    self:updateBossRows()
+end
+
+function TurtleDungeonTimer:collapseBossList()
+    if not self.frame.bossContainer then return end
+
+    -- Collapse frame
+    self.frame:SetHeight(115)
+    self.frame.bossContainer:Hide()
+
+    -- Update arrow direction (down) and position
+    self.frame.toggleButton.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+    self.frame.toggleButton:ClearAllPoints()
+    self.frame.toggleButton:SetPoint("TOPRIGHT", self.frame.progressBg, "BOTTOMRIGHT", 5, -11)
+end
+
+function TurtleDungeonTimer:updateBossRows()
+    if not self.frame or not self.frame.bossContainer then return end
+    
+    -- Don't update if list is collapsed
+    if not self.bossListExpanded then return end
+    
+    local rowHeight = 23
+    local bossCount = table.getn(self.bossList)
+    
+    -- Debug output
+    DEFAULT_CHAT_FRAME:AddMessage("updateBossRows: bossCount = " .. tostring(bossCount), 1, 1, 0)
+    
+    -- Initialize bossRows if needed (only create once!)
+    if not self.frame.bossRows or table.getn(self.frame.bossRows) ~= bossCount then
+        -- Clean up old rows if count changed
+        if self.frame.bossRows then
+            for i = 1, table.getn(self.frame.bossRows) do
+                if self.frame.bossRows[i] then
+                    if self.frame.bossRows[i].name then
+                        self.frame.bossRows[i].name:Hide()
+                    end
+                    if self.frame.bossRows[i].time then
+                        self.frame.bossRows[i].time:Hide()
+                    end
+                end
+            end
+        end
         
-        local btn = CreateFrame("Button", nil, reportDropdown)
-        btn:SetWidth(92)
-        btn:SetHeight(18)
-        btn:SetPoint("TOP", reportDropdown, "TOP", 0, -4 - (i-1) * 20)
+        -- Create new rows in scrollChild, not bossContainer!
+        self.frame.bossRows = {}
+        for i = 1, bossCount do
+            local boss = self.bossList[i]
+            local bossName = type(boss) == "table" and boss.name or boss
+            
+            DEFAULT_CHAT_FRAME:AddMessage("Creating row " .. i .. ": " .. tostring(bossName), 0, 1, 1)
+            
+            -- Boss name (left)
+            local nameText = self.frame.bossScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameText:SetPoint("TOPLEFT", self.frame.bossScrollChild, "TOPLEFT", 8, -(i-1) * rowHeight - 5)
+            nameText:SetText(bossName)
+            nameText:SetJustifyH("LEFT")
+            nameText:SetTextColor(1, 1, 1)
+            nameText:Show()  -- Explicitly show
+            
+            DEFAULT_CHAT_FRAME:AddMessage("  nameText created: " .. tostring(nameText:GetText()), 0, 1, 0)
+            
+            -- Kill time (right)
+            local timeText = self.frame.bossScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            timeText:SetPoint("TOPRIGHT", self.frame.bossScrollChild, "TOPRIGHT", -10, -(i-1) * rowHeight - 5)
+            timeText:SetText("--:--")
+            timeText:SetJustifyH("RIGHT")
+            timeText:SetTextColor(0.5, 0.5, 0.5)
+            timeText:Show()  -- Explicitly show
+            
+            self.frame.bossRows[i] = {name = nameText, time = timeText}
+        end
         
-        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        text:SetPoint("CENTER", btn, "CENTER", 0, 0)
-        text:SetText(chatLabel)
-        btn.text = text
-        
-        btn:SetScript("OnEnter", function()
-            this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-            this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
-        end)
-        btn:SetScript("OnLeave", function()
-            this:SetBackdrop(nil)
-        end)
-        btn:SetScript("OnClick", function()
-            TurtleDungeonTimer:getInstance():report(chatType)
-            reportDropdown:Hide()
-        end)
+        DEFAULT_CHAT_FRAME:AddMessage("Total rows created: " .. table.getn(self.frame.bossRows), 1, 1, 0)
     end
     
-    reportButton:SetScript("OnClick", function()
-        if reportDropdown:IsVisible() then
-            reportDropdown:Hide()
+    -- Update existing rows (colors and times only, no recreation!)
+    for i = 1, bossCount do
+        local boss = self.bossList[i]
+        local defeated = type(boss) == "table" and boss.defeated or false
+        local row = self.frame.bossRows[i]
+        
+        -- Skip if row doesn't exist or is incomplete
+        if not row or not row.name or not row.time then
+            -- Row is invalid, skip this one
+            -- Don't break - continue with next row
         else
-            reportDropdown:Show()
+            -- Get kill time
+            local killTime = nil
+            if self.killTimes[i] then
+                if type(self.killTimes[i]) == "table" then
+                    killTime = self.killTimes[i].time
+                else
+                    killTime = self.killTimes[i]
+                end
+            end
+            
+            if killTime or defeated then
+                -- Boss defeated - green text
+                row.name:SetTextColor(0.8, 1, 0.8)
+                row.time:SetTextColor(0.8, 1, 0.8)
+            
+                if killTime then
+                    local minutes = math.floor(killTime / 60)
+                    local seconds = killTime - (minutes * 60)
+                    row.time:SetText(string.format("%02d:%02d", minutes, seconds))
+                else
+                    row.time:SetText("✓")
+                end
+            else
+                -- Boss alive - white text
+                row.name:SetTextColor(1, 1, 1)
+                row.time:SetTextColor(0.5, 0.5, 0.5)
+                row.time:SetText("--:--")
+            end
         end
-    end)
+    end
 end
 
-function TurtleDungeonTimer:createExportButton(btnWidth, spacing)
-    local exportButton = CreateFrame("Button", nil, self.frame, "GameMenuButtonTemplate")
-    exportButton:SetWidth(btnWidth)
-    exportButton:SetHeight(30)
-    exportButton:SetPoint("LEFT", self.frame.reportButton, "RIGHT", spacing, 0)
-    exportButton:SetText("EXPORT")
-    exportButton:SetScript("OnClick", function()
-        TurtleDungeonTimer:getInstance():showExportDialog()
-    end)
-    self.frame.exportButton = exportButton
+function TurtleDungeonTimer:createBossRow(index, bossName, rowHeight)
+    -- Row container - DIRECTLY on bossContainer for testing
+    local row = CreateFrame("Frame", nil, self.frame.bossContainer)
+    row:SetWidth(365)            -- Full width
+    row:SetHeight(rowHeight - 2) -- Small gap between rows
+
+    -- Background with texture + vertex color
+    row.background = row:CreateTexture(nil, "BACKGROUND")
+    row.background:SetAllPoints(row)
+    row.background:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    row.background:SetVertexColor(0.15, 0.15, 0.15, 0.9) -- Dark gray default
+
+    -- Boss name (left)
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.nameText:SetPoint("LEFT", row, "LEFT", 10, 0)
+    row.nameText:SetTextColor(1, 1, 1)
+    row.nameText:SetText(bossName)
+    row.nameText:SetJustifyH("LEFT")
+    row.nameText:SetWidth(250)
+
+    -- Kill time (right)
+    row.timeText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.timeText:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    row.timeText:SetTextColor(0.5, 0.5, 0.5)
+    row.timeText:SetText("--:--")
+    row.timeText:SetJustifyH("RIGHT")
+
+    return row
 end
 
-function TurtleDungeonTimer:createHistoryButton(btnWidth, spacing)
-    local historyButton = CreateFrame("Button", nil, self.frame, "GameMenuButtonTemplate")
-    historyButton:SetWidth(btnWidth)
-    historyButton:SetHeight(30)
-    historyButton:SetPoint("LEFT", self.frame.exportButton, "RIGHT", spacing, 0)
-    historyButton:SetText("HISTORY")
-    self.frame.historyButton = historyButton
-    
-    -- Create history dropdown
-    local historyDropdown = CreateFrame("Frame", nil, historyButton)
-    historyDropdown:SetWidth(250)
-    historyDropdown:SetHeight(200)
-    historyDropdown:SetPoint("TOP", historyButton, "BOTTOM", 0, 0)
-    historyDropdown:SetBackdrop({
+-- ============================================================================
+-- UPDATE FUNCTIONS
+-- ============================================================================
+function TurtleDungeonTimer:updateUI()
+    if not self.frame then return end
+
+    self:updateTimerDisplay()
+    self:updateProgressBar()
+    self:updateDeathCount()
+
+    if self.bossListExpanded then
+        self:updateBossRows()
+    end
+end
+
+function TurtleDungeonTimer:updateTimerDisplay()
+    if not self.frame or not self.frame.timerText then return end
+
+    local timeStr = "00:00"
+    if self.isRunning and self.startTime then
+        local elapsed = GetTime() - self.startTime
+        local minutes = math.floor(elapsed / 60)
+        local seconds = elapsed - (minutes * 60)
+        timeStr = string.format("%02d:%02d", minutes, seconds)
+    elseif table.getn(self.killTimes) > 0 then
+        local lastKillTime = self.killTimes[table.getn(self.killTimes)]
+        if lastKillTime then
+            local minutes = math.floor(lastKillTime / 60)
+            local seconds = lastKillTime - (minutes * 60)
+            timeStr = string.format("%02d:%02d", minutes, seconds)
+        end
+    end
+
+    self.frame.timerText:SetText(timeStr)
+end
+
+function TurtleDungeonTimer:updateProgressBar()
+    if not self.frame or not self.frame.progressBar then return end
+
+    local progress = TDTTrashCounter:getProgress()
+    local width = 218 * (progress / 100)
+
+    self.frame.progressBar:SetWidth(math.max(1, width))
+    self.frame.progressText:SetText(string.format("%.0f%%", progress))
+end
+
+function TurtleDungeonTimer:updateDeathCount()
+    if not self.frame or not self.frame.deathText then return end
+
+    self.frame.deathText:SetText("" .. self.deathCount)
+end
+
+function TurtleDungeonTimer:updateDungeonName()
+    if not self.frame or not self.frame.dungeonNameText then return end
+
+    if self.selectedDungeon then
+        local dungeonData = self.DUNGEON_DATA[self.selectedDungeon]
+        if dungeonData then
+            self.frame.dungeonNameText:SetText(dungeonData.name)
+        end
+    else
+        self.frame.dungeonNameText:SetText("Select Dungeon...")
+    end
+end
+
+-- ============================================================================
+-- START/STOP BUTTON UPDATE
+-- ============================================================================
+function TurtleDungeonTimer:updateStartPauseButton()
+    if not self.frame or not self.frame.startButton then return end
+
+    if self.isRunning then
+        -- Show stop icon
+        self.frame.startButton.icon:SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
+    else
+        -- Show play icon
+        self.frame.startButton.icon:SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+    end
+end
+
+function TurtleDungeonTimer:toggleStartPause()
+    if self.isRunning then
+        self:pause()
+    else
+        self:start()
+    end
+end
+
+-- ============================================================================
+-- HISTORY MENU
+-- ============================================================================
+function TurtleDungeonTimer:showHistoryMenu(anchorFrame)
+    -- Create dropdown if it doesn't exist
+    if not self.historyDropdown then
+        self:createHistoryDropdown()
+    end
+
+    if self.historyDropdown:IsShown() then
+        self.historyDropdown:Hide()
+    else
+        self:populateHistoryDropdown()
+        self.historyDropdown:ClearAllPoints()
+        self.historyDropdown:SetPoint("TOPRIGHT", anchorFrame, "BOTTOMRIGHT", 0, 0)
+        self.historyDropdown:Show()
+    end
+end
+
+function TurtleDungeonTimer:createHistoryDropdown()
+    local dropdown = CreateFrame("Frame", nil, self.frame)
+    dropdown:SetWidth(280)
+    dropdown:SetHeight(250)
+    dropdown:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true,
         tileSize = 16,
         edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    historyDropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    historyDropdown:SetFrameStrata("DIALOG")
-    historyDropdown:Hide()
-    self.frame.historyDropdown = historyDropdown
-    
-    historyButton:SetScript("OnClick", function()
-        if historyDropdown:IsVisible() then
-            historyDropdown:Hide()
+    dropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    dropdown:SetFrameStrata("DIALOG")
+    dropdown:Hide()
+
+    -- Title
+    local title = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", dropdown, "TOP", 0, -10)
+    title:SetText("Run History")
+    title:SetTextColor(1, 0.82, 0)
+
+    -- Scroll frame for entries
+    local scrollFrame = CreateFrame("ScrollFrame", nil, dropdown)
+    scrollFrame:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 8, -30)
+    scrollFrame:SetWidth(264)
+    scrollFrame:SetHeight(210)
+    dropdown.scrollFrame = scrollFrame
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(264)
+    scrollChild:SetHeight(1)
+    scrollFrame:SetScrollChild(scrollChild)
+    dropdown.scrollChild = scrollChild
+
+    -- Enable scrolling
+    scrollFrame:EnableMouseWheel()
+    scrollFrame:SetScript("OnMouseWheel", function()
+        local current = scrollFrame:GetVerticalScroll()
+        local max = scrollFrame:GetVerticalScrollRange()
+        local step = 20
+        if arg1 > 0 then
+            scrollFrame:SetVerticalScroll(math.max(0, current - step))
         else
-            TurtleDungeonTimer:getInstance():updateHistoryDropdown()
-            historyDropdown:Show()
+            scrollFrame:SetVerticalScroll(math.min(max, current + step))
         end
     end)
+
+    dropdown.entries = {}
+    self.historyDropdown = dropdown
 end
 
-function TurtleDungeonTimer:updateHistoryDropdown()
-    local dropdown = self.frame.historyDropdown
-    if not dropdown then return end
-    
+function TurtleDungeonTimer:populateHistoryDropdown()
+    if not self.historyDropdown then return end
+
+    local dropdown = self.historyDropdown
+    local scrollChild = dropdown.scrollChild
+
     -- Clear previous entries
     if dropdown.entries then
         for i = 1, table.getn(dropdown.entries) do
             dropdown.entries[i]:Hide()
+            dropdown.entries[i] = nil
         end
     end
     dropdown.entries = {}
-    
+
     local history = TurtleDungeonTimerDB.history
     if not history or table.getn(history) == 0 then
-        local noData = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        noData:SetPoint("CENTER", dropdown, "CENTER", 0, 0)
-        noData:SetText("Keine Historie vorhanden")
+        local noData = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        noData:SetPoint("CENTER", scrollChild, "TOP", 0, -50)
+        noData:SetText("No history yet")
+        noData:SetTextColor(0.5, 0.5, 0.5)
         table.insert(dropdown.entries, noData)
         return
     end
-    
-    for i = 1, math.min(10, table.getn(history)) do
+
+    local rowHeight = 20
+    local numEntries = math.min(15, table.getn(history))
+    scrollChild:SetHeight(numEntries * rowHeight)
+
+    for i = 1, numEntries do
         local entry = history[i]
-        local yOffset = -10 - (i-1) * 20
-        
-        -- Create clickable button instead of text
-        local entryBtn = CreateFrame("Button", nil, dropdown)
-        entryBtn:SetWidth(230)
-        entryBtn:SetHeight(18)
-        entryBtn:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 10, yOffset)
-        
+        local yOffset = -(i - 1) * rowHeight
+
+        local entryBtn = CreateFrame("Button", nil, scrollChild)
+        entryBtn:SetWidth(250)
+        entryBtn:SetHeight(rowHeight - 2)
+        entryBtn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, yOffset)
+
         local entryText = entryBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        entryText:SetPoint("LEFT", entryBtn, "LEFT", 0, 0)
+        entryText:SetPoint("LEFT", entryBtn, "LEFT", 5, 0)
         entryText:SetJustifyH("LEFT")
-        entryText:SetWidth(230)
-        
+        entryText:SetWidth(240)
+
         local timeStr = self:formatTime(entry.time)
-        local statusStr = entry.completed == false and " [Incomplete]" or ""
-        local text = string.format("%s - %s (%dd)%s", entry.dungeon, timeStr, entry.deathCount, statusStr)
+        local statusStr = entry.completed == false and " [X]" or ""
+        local text = string.format("%s - %s (%dd)%s", entry.dungeon or "?", timeStr, entry.deathCount or 0, statusStr)
         if entry.date then
-            text = entry.date .. " - " .. text
+            text = entry.date .. " " .. text
         end
         entryText:SetText(text)
-        
-        -- Color incomplete runs differently
+
         if entry.completed == false then
-            entryText:SetTextColor(1, 0.7, 0.3) -- Orange for incomplete
+            entryText:SetTextColor(1, 0.7, 0.3)
         else
-            entryText:SetTextColor(1, 1, 1) -- White for complete
+            entryText:SetTextColor(1, 1, 1)
         end
-        
-        -- Hover effect
+
+        -- Capture entry for closure
+        local capturedEntry = entry
+
         entryBtn:SetScript("OnEnter", function()
-            entryBtn:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-            entryBtn:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
+            this:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background" })
+            this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
         end)
         entryBtn:SetScript("OnLeave", function()
-            entryBtn:SetBackdrop(nil)
+            this:SetBackdrop(nil)
         end)
-        
-        -- Click to show details
         entryBtn:SetScript("OnClick", function()
-            TurtleDungeonTimer:getInstance():showHistoryDetails(entry)
+            TurtleDungeonTimer:getInstance():showHistoryDetails(capturedEntry)
             dropdown:Hide()
         end)
-        
+
         table.insert(dropdown.entries, entryBtn)
     end
 end
 
 function TurtleDungeonTimer:showHistoryDetails(entry)
-    -- Close existing detail window if open
     if self.historyDetailFrame then
         self.historyDetailFrame:Hide()
         self.historyDetailFrame = nil
     end
-    
-    -- Create detail window
+
     local detailFrame = CreateFrame("Frame", nil, UIParent)
     detailFrame:SetWidth(350)
     detailFrame:SetHeight(400)
@@ -488,7 +956,7 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
         tile = true,
         tileSize = 16,
         edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
     detailFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
     detailFrame:SetFrameStrata("DIALOG")
@@ -498,12 +966,13 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
     detailFrame:SetScript("OnDragStart", function() this:StartMoving() end)
     detailFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
     self.historyDetailFrame = detailFrame
-    
+
     -- Title
     local title = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", detailFrame, "TOP", 0, -15)
-    title:SetText(entry.dungeon .. " - " .. (entry.variant or "Default"))
-    
+    title:SetText((entry.dungeon or "?") .. " - " .. (entry.variant or "Default"))
+    title:SetTextColor(1, 0.82, 0)
+
     -- Close button
     local closeBtn = CreateFrame("Button", nil, detailFrame)
     closeBtn:SetWidth(20)
@@ -513,693 +982,141 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
     closeText:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
     closeText:SetText("X")
     closeText:SetTextColor(1, 0, 0)
-    closeBtn:SetScript("OnClick", function()
-        detailFrame:Hide()
-    end)
-    
-    -- Run info
+    closeBtn:SetScript("OnClick", function() detailFrame:Hide() end)
+
+    -- Info text
     local infoText = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     infoText:SetPoint("TOP", title, "BOTTOM", 0, -10)
-    local timeStr = self:formatTime(entry.time)
-    infoText:SetText(string.format("Zeit: %s | Deaths: %d", timeStr, entry.deathCount))
-    
-    if entry.date then
-        local dateText = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        dateText:SetPoint("TOP", infoText, "BOTTOM", 0, -5)
-        dateText:SetText(entry.date)
-        dateText:SetTextColor(0.7, 0.7, 0.7)
-    end
-    
-    -- Boss kills section
-    local bossHeader = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    bossHeader:SetPoint("TOP", infoText, "BOTTOM", 0, -25)
-    bossHeader:SetText("Boss Kills:")
-    
-    -- Scroll frame for boss list
-    local scrollFrame = CreateFrame("ScrollFrame", nil, detailFrame)
-    scrollFrame:SetWidth(320)
-    scrollFrame:SetHeight(220)
-    scrollFrame:SetPoint("TOP", bossHeader, "BOTTOM", 0, -10)
-    
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(300)
-    local bossCount = table.getn(entry.killTimes or {})
-    scrollChild:SetHeight(math.max(220, bossCount * 25))
-    scrollFrame:SetScrollChild(scrollChild)
-    
-    -- Add scrollbar if needed
-    if bossCount * 25 > 220 then
-        local scrollbar = CreateFrame("Slider", nil, scrollFrame)
-        scrollbar:SetOrientation("VERTICAL")
-        scrollbar:SetWidth(16)
-        scrollbar:SetHeight(220)
-        scrollbar:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", -2, 0)
-        scrollbar:SetMinMaxValues(0, (bossCount * 25) - 220)
-        scrollbar:SetValueStep(25)
-        scrollbar:SetValue(0)
-        scrollbar:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true,
-            tileSize = 16,
-            edgeSize = 8,
-            insets = {left = 3, right = 3, top = 3, bottom = 3}
-        })
-        scrollbar:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
-        
-        local thumb = scrollbar:CreateTexture(nil, "OVERLAY")
-        thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-        thumb:SetWidth(16)
-        thumb:SetHeight(24)
-        scrollbar:SetThumbTexture(thumb)
-        
-        scrollbar:SetScript("OnValueChanged", function()
-            scrollFrame:SetVerticalScroll(this:GetValue())
-        end)
-        
-        scrollFrame:EnableMouseWheel(true)
-        scrollFrame:SetScript("OnMouseWheel", function()
-            local delta = arg1
-            local current = scrollbar:GetValue()
-            local minVal, maxVal = scrollbar:GetMinMaxValues()
-            if delta < 0 and current < maxVal then
-                scrollbar:SetValue(math.min(maxVal, current + 25))
-            elseif delta > 0 and current > minVal then
-                scrollbar:SetValue(math.max(minVal, current - 25))
-            end
-        end)
-    end
-    
-    -- Display boss kills
+    local timeStr = self:formatTime(entry.time or 0)
+    infoText:SetText(string.format("Time: %s | %d", timeStr, entry.deathCount or 0))
+
+    -- Boss kills list
     if entry.killTimes and table.getn(entry.killTimes) > 0 then
+        local bossTitle = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        bossTitle:SetPoint("TOPLEFT", detailFrame, "TOPLEFT", 20, -70)
+        bossTitle:SetText("Boss Kills:")
+        bossTitle:SetTextColor(1, 0.82, 0)
+
+        -- Sort killTimes by index (boss list order) instead of kill order
+        local sortedKills = {}
         for i = 1, table.getn(entry.killTimes) do
-            local kill = entry.killTimes[i]
-            local yPos = -5 - (i-1) * 25
-            
-            local bossText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            bossText:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 10, yPos)
-            bossText:SetJustifyH("LEFT")
-            bossText:SetWidth(180)
-            bossText:SetText(kill.bossName or "Unknown Boss")
-            
-            local timeText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            timeText:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", -10, yPos)
-            timeText:SetJustifyH("RIGHT")
-            local killTimeStr = self:formatTime(kill.time)
-            if kill.splitTime and kill.splitTime > 0 then
-                killTimeStr = killTimeStr .. " (+" .. self:formatTime(kill.splitTime) .. ")"
-            end
-            timeText:SetText(killTimeStr)
-            timeText:SetTextColor(0, 1, 0)
+            table.insert(sortedKills, entry.killTimes[i])
         end
-    else
-        local noBosses = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        noBosses:SetPoint("CENTER", scrollChild, "CENTER", 0, 0)
-        noBosses:SetText("Keine Boss-Daten verfügbar")
-        noBosses:SetTextColor(0.7, 0.7, 0.7)
+        table.sort(sortedKills, function(a, b)
+            return (a.index or 0) < (b.index or 0)
+        end)
+
+        for i = 1, table.getn(sortedKills) do
+            local kill = sortedKills[i]
+            local killText = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            killText:SetPoint("TOPLEFT", bossTitle, "BOTTOMLEFT", 5, -(i - 1) * 18 - 5)
+            killText:SetText(string.format("%d. %s - %s", i, kill.bossName or "?", self:formatTime(kill.time or 0)))
+        end
     end
-    
-    -- Buttons at bottom
-    local reportBtn = CreateFrame("Button", nil, detailFrame, "GameMenuButtonTemplate")
-    reportBtn:SetWidth(80)
-    reportBtn:SetHeight(25)
-    reportBtn:SetPoint("BOTTOMLEFT", detailFrame, "BOTTOMLEFT", 50, 15)
-    reportBtn:SetText("REPORT")
-    reportBtn:SetScript("OnClick", function()
-        self:reportHistoryEntry(entry)
-    end)
-    
-    local exportBtn = CreateFrame("Button", nil, detailFrame, "GameMenuButtonTemplate")
-    exportBtn:SetWidth(80)
-    exportBtn:SetHeight(25)
-    exportBtn:SetPoint("BOTTOMRIGHT", detailFrame, "BOTTOMRIGHT", -20, 15)
-    exportBtn:SetText("EXPORT")
-    exportBtn:SetScript("OnClick", function()
-        self:showExportDialog(entry)
-    end)
-    
+
     detailFrame:Show()
 end
 
-function TurtleDungeonTimer:reportHistoryEntry(entry)
-    if not entry then return end
-    
-    -- Create report dropdown similar to main report button
-    local detailFrame = self.historyDetailFrame
-    if not detailFrame then return end
-    
-    -- Create or show report dropdown
-    if detailFrame.reportDropdown and detailFrame.reportDropdown:IsVisible() then
-        detailFrame.reportDropdown:Hide()
-        return
-    end
-    
-    if not detailFrame.reportDropdown then
-        local dropdown = CreateFrame("Frame", nil, detailFrame)
-        dropdown:SetWidth(100)
-        dropdown:SetHeight(80)
-        dropdown:SetPoint("TOPLEFT", detailFrame, "BOTTOMLEFT", 20, -15)
-        dropdown:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true,
-            tileSize = 16,
-            edgeSize = 16,
-            insets = {left = 4, right = 4, top = 4, bottom = 4}
-        })
-        dropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-        dropdown:SetFrameStrata("TOOLTIP")
-        detailFrame.reportDropdown = dropdown
-        
-        local channels = {{"SAY", "Say"}, {"PARTY", "Party"}, {"RAID", "Raid"}, {"GUILD", "Guild"}}
-        for i, channelData in ipairs(channels) do
-            local chatType = channelData[1]
-            local chatLabel = channelData[2]
-            
-            local btn = CreateFrame("Button", nil, dropdown)
-            btn:SetWidth(92)
-            btn:SetHeight(18)
-            btn:SetPoint("TOP", dropdown, "TOP", 0, -4 - (i-1) * 20)
-            
-            local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            text:SetPoint("CENTER", btn, "CENTER", 0, 0)
-            text:SetText(chatLabel)
-            
-            btn:SetScript("OnEnter", function()
-                this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-                this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
-            end)
-            btn:SetScript("OnLeave", function()
-                this:SetBackdrop(nil)
-            end)
-            btn:SetScript("OnClick", function()
-                TurtleDungeonTimer:getInstance():sendHistoryReport(entry, chatType)
-                dropdown:Hide()
-            end)
+-- ============================================================================
+-- COMPATIBILITY - Keep existing functions for other parts of code
+-- ============================================================================
+function TurtleDungeonTimer:resetUI()
+    self.deathCount = 0
+    self.killTimes = {}
+
+    -- Reset boss defeated states
+    for i = 1, table.getn(self.bossList) do
+        if type(self.bossList[i]) == "table" then
+            self.bossList[i].defeated = false
         end
     end
-    
-    detailFrame.reportDropdown:Show()
+
+    self:updateUI()
+
+    -- Collapse boss list on reset
+    if self.bossListExpanded then
+        self:collapseBossList()
+        self.bossListExpanded = false
+    end
 end
 
-function TurtleDungeonTimer:sendHistoryReport(entry, chatType)
-    if not entry then return end
-    
-    chatType = chatType or "SAY"
-    
-    local dungeonStr = entry.dungeon or "Unknown"
-    if entry.variant and entry.variant ~= "Default" then
-        dungeonStr = dungeonStr .. " (" .. entry.variant .. ")"
+function TurtleDungeonTimer:updateFrameSize()
+    -- Called by other code - trigger boss list update if expanded
+    if self.bossListExpanded then
+        self:expandBossList()
     end
-    
-    -- Remove leading ! to prevent command parsing
-    if string.sub(dungeonStr, 1, 1) == "!" then
-        dungeonStr = string.sub(dungeonStr, 2)
-    end
-    
-    local mainMessage = dungeonStr .. " completed in " .. self:formatTime(entry.time) .. ". Deaths: " .. entry.deathCount
-    SendChatMessage(mainMessage, chatType)
-    
-    -- Combine bosses into readable messages (max ~255 chars per message)
-    if entry.killTimes and table.getn(entry.killTimes) > 0 then
-        local bossLine = "Bosses: "
-        local lineCount = 0
-        
-        for i = 1, table.getn(entry.killTimes) do
-            local bossEntry = entry.killTimes[i].bossName .. " (" .. self:formatTime(entry.killTimes[i].time) .. ")"
-            
-            -- Check if adding this boss would make the line too long
-            if string.len(bossLine .. bossEntry) > 240 then
-                SendChatMessage(bossLine, chatType)
-                bossLine = bossEntry
-                lineCount = lineCount + 1
-            else
-                if i > 1 and bossLine ~= "Bosses: " then
-                    bossLine = bossLine .. ", "
-                end
-                bossLine = bossLine .. bossEntry
+end
+
+function TurtleDungeonTimer:setDungeonSelectorEnabled(enabled)
+    -- Dungeon name is always clickable in new design
+end
+
+function TurtleDungeonTimer:rebuildBossRows()
+    -- Clear existing rows
+    if self.frame and self.frame.bossRows then
+        for i = 1, table.getn(self.frame.bossRows) do
+            if self.frame.bossRows[i] then
+                self.frame.bossRows[i]:Hide()
+                self.frame.bossRows[i] = nil
             end
         end
-        
-        -- Send remaining bosses
-        if bossLine ~= "Bosses: " then
-            SendChatMessage(bossLine, chatType)
-        end
+        self.frame.bossRows = {}
     end
-end
 
-function TurtleDungeonTimer:exportHistoryEntry(entry)
-    if not entry then return end
-    
-    -- Build export string from history entry
-    local parts = {"TDT"}
-    
-    -- Dungeon name
-    local dungeonName = entry.dungeon or "Unknown"
-    dungeonName = string.gsub(dungeonName, "[%s:]", "_")
-    table.insert(parts, dungeonName)
-    
-    -- Variant
-    local variant = entry.variant or "Default"
-    variant = string.gsub(variant, "[%s:]", "_")
-    table.insert(parts, variant)
-    
-    -- Total time
-    table.insert(parts, string.format("%.0f", entry.time or 0))
-    
-    -- Deaths
-    table.insert(parts, tostring(entry.deathCount or 0))
-    
-    -- Boss times
-    if entry.killTimes then
-        for i = 1, table.getn(entry.killTimes) do
-            local bossName = string.gsub(entry.killTimes[i].bossName, "[%s:]", "_")
-            local bossTime = string.format("%.0f", entry.killTimes[i].time)
-            table.insert(parts, bossName .. ":" .. bossTime)
-        end
+    -- Update if expanded
+    if self.bossListExpanded then
+        self:expandBossList()
     end
-    
-    local rawString = table.concat(parts, "|")
-    local exportString = self:encodeBase64(rawString)
-    
-    -- Show export in chat
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Export String:")
-    DEFAULT_CHAT_FRAME:AddMessage(exportString)
-    
-    -- Show in export dialog
-    if self.exportDialog then
-        if self.exportDialog.editBox then
-            self.exportDialog.editBox:SetText(exportString)
-            self.exportDialog.editBox:HighlightText()
-        end
-        self.exportDialog:Show()
-    else
-        -- Create export dialog if it doesn't exist
-        self:createExportDialogForHistory(exportString)
-    end
-end
-
-function TurtleDungeonTimer:createExportDialogForHistory(exportString)
-    local dialog = CreateFrame("Frame", nil, UIParent)
-    dialog:SetWidth(400)
-    dialog:SetHeight(200)
-    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    dialog:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true,
-        tileSize = 32,
-        edgeSize = 32,
-        insets = {left = 11, right = 12, top = 12, bottom = 11}
-    })
-    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
-    self.exportDialog = dialog
-    
-    -- Title
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", dialog, "TOP", 0, -20)
-    title:SetText("Export Run Data")
-    
-    -- Description
-    local desc = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    desc:SetPoint("TOP", title, "BOTTOM", 0, -10)
-    desc:SetText("Export string is also printed in chat for easy copying.")
-    
-    -- Edit box for export string
-    local editBox = CreateFrame("EditBox", nil, dialog)
-    editBox:SetWidth(360)
-    editBox:SetHeight(60)
-    editBox:SetPoint("TOP", desc, "BOTTOM", 0, -15)
-    editBox:SetMultiLine(true)
-    editBox:SetAutoFocus(false)
-    editBox:SetFontObject(GameFontNormalSmall)
-    editBox:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true,
-        tileSize = 16,
-        edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
-    })
-    editBox:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
-    editBox:SetText(exportString)
-    editBox:HighlightText()
-    editBox:SetScript("OnEscapePressed", function() this:ClearFocus() end)
-    dialog.editBox = editBox
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
-    closeBtn:SetWidth(100)
-    closeBtn:SetHeight(25)
-    closeBtn:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
-    closeBtn:SetText("Close")
-    closeBtn:SetScript("OnClick", function()
-        dialog:Hide()
-    end)
-    
-    dialog:Show()
-end
-
-function TurtleDungeonTimer:createHeader()
-    local headerBg = CreateFrame("Button", nil, self.frame)
-    headerBg:SetWidth(240)
-    headerBg:SetHeight(65)
-    headerBg:SetPoint("TOP", self.frame.dungeonSelector, "BOTTOM", 0, -3)
-    headerBg:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true,
-        tileSize = 16,
-        edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
-    })
-    headerBg:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    self.frame.headerBg = headerBg
-    
-    -- Boss List Toggle (clicking on header)
-    headerBg:SetScript("OnClick", function() 
-        TurtleDungeonTimer:getInstance():toggleBossList() 
-    end)
-    headerBg:SetScript("OnEnter", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        -- Check if run is completed (all bosses defeated)
-        if table.getn(timer.killTimes) >= table.getn(timer.bossList) and table.getn(timer.killTimes) > 0 then
-            this:SetBackdropColor(0.15, 0.6, 0.15, 0.8)  -- Lighter green on hover
-        else
-            this:SetBackdropColor(0.15, 0.15, 0.15, 0.8)
-        end
-    end)
-    headerBg:SetScript("OnLeave", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        -- Check if run is completed (all bosses defeated)
-        if table.getn(timer.killTimes) >= table.getn(timer.bossList) and table.getn(timer.killTimes) > 0 then
-            this:SetBackdropColor(0.1, 0.5, 0.1, 0.8)  -- Green background
-        else
-            this:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-        end
-    end)
-    
-    -- Dungeon Name
-    local dungeonNameText = headerBg:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    dungeonNameText:SetPoint("LEFT", headerBg, "LEFT", 14, 8)
-    dungeonNameText:SetJustifyH("LEFT")
-    dungeonNameText:SetWidth(140)
-    dungeonNameText:SetHeight(40)
-    dungeonNameText:SetText("Select Dungeon")
-    dungeonNameText:SetTextColor(1, 0.82, 0)  -- Gold color
-    self.frame.dungeonNameText = dungeonNameText
-    
-    -- Time Display
-    local timeText = headerBg:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    timeText:SetPoint("RIGHT", headerBg, "RIGHT", -34, 10)
-    timeText:SetJustifyH("RIGHT")
-    timeText:SetText("00:00")
-    timeText:SetTextColor(1, 1, 1)  -- White color
-    self.frame.timeText = timeText
-    
-    -- Toggle Indicator (hidden by default, shown when minimized)
-    local toggleIndicator = headerBg:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    toggleIndicator:SetPoint("RIGHT", headerBg, "RIGHT", -14, 10)
-    toggleIndicator:SetText("-")
-    toggleIndicator:SetTextColor(0.8, 0.8, 0.8)
-    toggleIndicator:Hide()
-    self.frame.toggleIndicator = toggleIndicator
-    
-    -- Best Time Display
-    local bestTimeText = headerBg:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bestTimeText:SetPoint("LEFT", headerBg, "LEFT", 14, -16)
-    bestTimeText:SetJustifyH("LEFT")
-    bestTimeText:SetText("Best: --:--")
-    bestTimeText:SetTextColor(0.5, 0.5, 0.5)
-    self.frame.bestTimeText = bestTimeText
-    
-    -- Death Counter
-    local deathText = headerBg:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    deathText:SetPoint("RIGHT", headerBg, "RIGHT", -34, -10)
-    deathText:SetJustifyH("RIGHT")
-    deathText:SetText("Deaths: 0")
-    deathText:SetTextColor(1, 0.5, 0.5)
-    self.frame.deathText = deathText
-end
-
-function TurtleDungeonTimer:createMinimizeButton()
-    -- Minimize Button (top right corner of main frame)
-    local minimizeButton = CreateFrame("Button", nil, self.frame)
-    minimizeButton:SetWidth(20)
-    minimizeButton:SetHeight(20)
-    minimizeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -12, -8)
-    minimizeButton:SetFrameLevel(self.frame:GetFrameLevel() + 10)
-    
-    local minText = minimizeButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    minText:SetPoint("CENTER", minimizeButton, "CENTER", 0, 0)
-    minText:SetText("_")
-    minText:SetTextColor(1, 0.82, 0)
-    minimizeButton.text = minText
-    
-    minimizeButton:SetScript("OnClick", function()
-        TurtleDungeonTimer:getInstance():toggleMinimized()
-    end)
-    minimizeButton:SetScript("OnEnter", function()
-        minText:SetTextColor(1, 1, 0)
-    end)
-    minimizeButton:SetScript("OnLeave", function()
-        minText:SetTextColor(1, 0.82, 0)
-    end)
-    self.frame.minimizeButton = minimizeButton
-end
-
--- ============================================================================
--- UI UPDATE FUNCTIONS
--- ============================================================================
-function TurtleDungeonTimer:updateFrameSize()
-    if not self.frame then return end
-    
-    if self.minimized then
-        self.frame:SetHeight(80)
-        return
-    end
-    
-    local baseHeight = 135
-    local maxVisibleBosses = 6
-    local bossRowHeight = 35
-    local spacing = 5
-    local bossAreaHeight = 0
-    local buttonHeight = 55
-    
-    if self.bossListExpanded and table.getn(self.bossList) > 0 then
-        local numBosses = table.getn(self.bossList)
-        local visibleBosses = math.min(numBosses, maxVisibleBosses)
-        bossAreaHeight = (visibleBosses * bossRowHeight) + ((visibleBosses - 1) * spacing) + 20
-    end
-    
-    self.frame:SetHeight(baseHeight + bossAreaHeight + buttonHeight)
-    
-    -- Position buttons below boss list with spacing
-    local headerY = -75
-    local buttonY = headerY - 65 - bossAreaHeight
-    
-    -- All buttons in one row: RESET, REPORT, EXPORT, HISTORY
-    -- Total width: 4*42 + 3*3 = 177px, start at -88.5px to center
-    
-    -- RESET button (leftmost)
-    if self.frame.resetButton then
-        self.frame.resetButton:ClearAllPoints()
-        self.frame.resetButton:SetPoint("TOP", self.frame, "TOP", -88.5, buttonY)
-    end
-    
-    -- REPORT button right of RESET
-    if self.frame.reportButton then
-        self.frame.reportButton:ClearAllPoints()
-        self.frame.reportButton:SetPoint("LEFT", self.frame.resetButton, "RIGHT", 3, 0)
-    end
-    
-    -- EXPORT button right of REPORT
-    if self.frame.exportButton then
-        self.frame.exportButton:ClearAllPoints()
-        self.frame.exportButton:SetPoint("LEFT", self.frame.reportButton, "RIGHT", 3, 0)
-    end
-    
-    -- HISTORY button right of EXPORT
-    if self.frame.historyButton then
-        self.frame.historyButton:ClearAllPoints()
-        self.frame.historyButton:SetPoint("LEFT", self.frame.exportButton, "RIGHT", 3, 0)
-    end
-end
-
-function TurtleDungeonTimer:toggleMinimized()
-    self.minimized = not self.minimized
-    TurtleDungeonTimerDB.minimized = self.minimized
-    self:updateMinimizedState()
-end
-
-function TurtleDungeonTimer:updateMinimizedState()
-    if not self.frame then return end
-    
-    if self.minimized then
-        -- Make main frame background transparent
-        self.frame:SetBackdropColor(0, 0, 0, 0)
-        self.frame:SetBackdropBorderColor(0, 0, 0, 0)
-        
-        -- Move header to top of frame
-        if self.frame.headerBg then
-            self.frame.headerBg:ClearAllPoints()
-            self.frame.headerBg:SetPoint("TOP", self.frame, "TOP", 0, -5)
-        end
-        
-        -- Reposition minimize button to headerBg
-        if self.frame.minimizeButton and self.frame.headerBg then
-            self.frame.minimizeButton:ClearAllPoints()
-            self.frame.minimizeButton:SetPoint("RIGHT", self.frame.headerBg, "RIGHT", -5, 0)
-        end
-        
-        -- Hide everything except header, best time and death count
-        if self.frame.dungeonSelector then self.frame.dungeonSelector:Hide() end
-        if self.frame.dungeonLabel then self.frame.dungeonLabel:Hide() end
-        if self.frame.resetButton then self.frame.resetButton:Hide() end
-        if self.frame.reportButton then self.frame.reportButton:Hide() end
-        if self.frame.exportButton then self.frame.exportButton:Hide() end
-        if self.frame.historyButton then self.frame.historyButton:Hide() end
-        if self.frame.bossScrollFrame then self.frame.bossScrollFrame:Hide() end
-        if self.frame.reportDropdown then self.frame.reportDropdown:Hide() end
-        
-        -- Show best time and death count
-        if self.frame.bestTimeText then self.frame.bestTimeText:Show() end
-        if self.frame.deathText then self.frame.deathText:Show() end
-        
-        -- Update minimize button text
-        if self.frame.minimizeButton and self.frame.minimizeButton.text then
-            self.frame.minimizeButton.text:SetText("+")
-        end
-    else
-        -- Restore main frame background
-        self.frame:SetBackdropColor(0, 0, 0, 1)
-        self.frame:SetBackdropBorderColor(1, 1, 1, 1)
-        
-        -- Restore header position
-        if self.frame.headerBg and self.frame.dungeonSelector then
-            self.frame.headerBg:ClearAllPoints()
-            self.frame.headerBg:SetPoint("TOP", self.frame.dungeonSelector, "BOTTOM", 0, -3)
-        end
-        
-        -- Restore minimize button to frame
-        if self.frame.minimizeButton then
-            self.frame.minimizeButton:ClearAllPoints()
-            self.frame.minimizeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -12, -8)
-        end
-        
-        -- Show everything
-        if self.frame.dungeonSelector then self.frame.dungeonSelector:Show() end
-        if self.frame.dungeonLabel then self.frame.dungeonLabel:Show() end
-        if self.frame.resetButton then self.frame.resetButton:Show() end
-        if self.frame.reportButton then self.frame.reportButton:Show() end
-        if self.frame.exportButton then self.frame.exportButton:Show() end
-        if self.frame.historyButton then self.frame.historyButton:Show() end
-        if self.frame.bestTimeText then self.frame.bestTimeText:Show() end
-        if self.frame.deathText then self.frame.deathText:Show() end
-        
-        if self.frame.bossScrollFrame and self.bossListExpanded then 
-            self.frame.bossScrollFrame:Show()
-        end
-        
-        -- Update minimize button text
-        if self.frame.minimizeButton and self.frame.minimizeButton.text then
-            self.frame.minimizeButton.text:SetText("_")
-        end
-    end
-    
-    self:updateFrameSize()
-end
-
-function TurtleDungeonTimer:toggleBossList()
-    self.bossListExpanded = not self.bossListExpanded
-    
-    if self.frame.bossScrollFrame then
-        if self.bossListExpanded then
-            self.frame.bossScrollFrame:Show()
-        else
-            self.frame.bossScrollFrame:Hide()
-        end
-    end
-    
-    if self.frame.toggleIndicator then
-        if self.bossListExpanded then
-            self.frame.toggleIndicator:SetText("-")
-        else
-            self.frame.toggleIndicator:SetText("+")
-        end
-    end
-    
-    self:updateFrameSize()
 end
 
 function TurtleDungeonTimer:updateBestTimeDisplay()
-    if not self.frame or not self.frame.bestTimeText then return end
-    
-    local bestTime = self:getBestTime()
-    if bestTime then
-        self.frame.bestTimeText:SetText("Best: " .. self:formatTime(bestTime.time) .. " (" .. bestTime.deaths .. " deaths)")
-        self.frame.bestTimeText:SetTextColor(1, 0.82, 0)
-    else
-        self.frame.bestTimeText:SetText("Best: --:--")
-        self.frame.bestTimeText:SetTextColor(0.5, 0.5, 0.5)
+    -- Not needed in new design (no best time display in header)
+end
+
+function TurtleDungeonTimer:updatePrepareButtonState()
+    -- No separate prepare button - integrated into start button
+end
+
+function TurtleDungeonTimer:toggleMinimized()
+    -- No minimize button in new design - just ignore
+end
+
+function TurtleDungeonTimer:updateMinimizedState()
+    -- No minimize functionality in new design - just ignore
+end
+
+-- Called when a boss is killed - update UI
+function TurtleDungeonTimer:onBossKilled(bossIndex)
+    if self.bossList[bossIndex] and type(self.bossList[bossIndex]) == "table" then
+        self.bossList[bossIndex].defeated = true
+    end
+
+    if self.bossListExpanded then
+        self:updateBossRows()
     end
 end
 
-function TurtleDungeonTimer:resetUI()
+-- ============================================================================
+-- SHOW/HIDE
+-- ============================================================================
+function TurtleDungeonTimer:show()
+    if self.frame then
+        self.frame:Show()
+    end
+end
+
+function TurtleDungeonTimer:hide()
+    if self.frame then
+        self.frame:Hide()
+    end
+end
+
+function TurtleDungeonTimer:toggleVisibility()
     if not self.frame then return end
-    
-    if self.frame.dungeonNameText then
-        local displayName = self.selectedDungeon
-        if self.selectedVariant ~= "Default" then
-            displayName = displayName .. " - " .. self.selectedVariant
-        end
-        self.frame.dungeonNameText:SetText(displayName)
-        self.frame.dungeonNameText:SetTextColor(1, 0.82, 0)
-    end
-    
-    if self.frame.timeText then
-        self.frame.timeText:SetText("00:00")
-        self.frame.timeText:SetTextColor(1, 1, 1)
-    end
-    
-    if self.frame.headerBg then
-        self.frame.headerBg:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
-    end
-    
-    if self.frame.bestTimeText then
-        local bestTime = self:getBestTime()
-        if bestTime then
-            self.frame.bestTimeText:SetText("Best: " .. self:formatTime(bestTime.time) .. " (" .. bestTime.deaths .. " deaths)")
-        else
-            self.frame.bestTimeText:SetText("Best: --:--")
-        end
-        self.frame.bestTimeText:SetTextColor(0.5, 0.5, 0.5)
-    end
-    
-    if self.frame.deathText then
-        self.frame.deathText:SetText("Deaths: 0")
-        self.frame.deathText:SetTextColor(1, 0.5, 0.5)
-    end
-    
-    if self.frame.bossRows then
-        for i = 1, table.getn(self.frame.bossRows) do
-            self.frame.bossRows[i].timeText:SetText("-")
-            
-            -- Reset background color based on whether boss is optional
-            local bossName = self.frame.bossRows[i].bossName
-            local isOptional = self.optionalBosses[bossName]
-            
-            if isOptional then
-                self.frame.bossRows[i]:SetBackdropColor(0.15, 0.15, 0.2, 0.5)
-            else
-                self.frame.bossRows[i]:SetBackdropColor(0.2, 0.2, 0.2, 0.6)
-            end
-            
-            if self.frame.bossRows[i].checkmark then
-                self.frame.bossRows[i].checkmark:Hide()
-            end
-        end
+
+    if self.frame:IsShown() then
+        self:hide()
+    else
+        self:show()
     end
 end
-
--- Continued in next file part...

@@ -13,6 +13,13 @@ SlashCmdList["TURTLEDUNGEONTIMER"] = function(msg)
         timer:stop()
     elseif msg == "hide" then
         timer:hide()
+    elseif msg == "debug" then
+        timer:toggleDebugMode()
+    elseif msg == "debugshow" then
+        timer:showDebugFrame()
+    elseif msg == "eventdebug" then
+        TurtleDungeonTimerDB.debug = not TurtleDungeonTimerDB.debug
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Event Debug: " .. tostring(TurtleDungeonTimerDB.debug))
     elseif msg == "toggle" or msg == "help" then
         timer:toggle()
     else

@@ -32,8 +32,14 @@ function TurtleDungeonTimer:checkForAddons()
     self:sendSyncMessage("ADDON_CHECK")
 end
 
-function TurtleDungeonTimer:onAddonCheckResponse(sender)
+function TurtleDungeonTimer:onAddonCheckResponse(sender, version)
     self.playersWithAddon[sender] = true
+    
+    -- Store version for preparation checks
+    if not self.preparationChecks then
+        self.preparationChecks = {}
+    end
+    self.preparationChecks[sender] = version or self.SYNC_VERSION
 end
 
 function TurtleDungeonTimer:getAddonUserCount()
@@ -57,6 +63,10 @@ function TurtleDungeonTimer:syncFrameOnEvent()
         end
     elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
         instance:checkForAddons()
+        -- Delay button update because group status might not be updated immediately
+        instance:scheduleTimer(function()
+            instance:updatePrepareButtonState()
+        end, 0.1, false)
     end
 end
 
@@ -70,6 +80,7 @@ function TurtleDungeonTimer:initializeSync()
     end
     
     self:checkForAddons()
+    self:updatePrepareButtonState()
 end
 
 -- ============================================================================
@@ -194,9 +205,9 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
     end
     
     if msgType == "ADDON_CHECK" then
-        self:sendSyncMessage("ADDON_RESPONSE")
+        self:sendSyncMessage("ADDON_RESPONSE", self.SYNC_VERSION)
     elseif msgType == "ADDON_RESPONSE" then
-        self:onAddonCheckResponse(sender)
+        self:onAddonCheckResponse(sender, data)
     elseif msgType == "RESET_REQUEST" then
         self:onSyncResetRequest(sender)
     elseif msgType == "RESET_VOTE" then
@@ -205,6 +216,30 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
         self:onSyncResetCancel(sender)
     elseif msgType == "RESET_EXECUTE" then
         self:onSyncResetExecute(sender)
+    elseif msgType == "BOSS_KILL" then
+        self:onSyncBossKill(data, sender)
+    elseif msgType == "TRASH_KILL" then
+        self:onSyncTrashKill(data, sender)
+    elseif msgType == "TIMER_START" then
+        self:onSyncTimerStart(sender)
+    elseif msgType == "TIMER_COMPLETE" then
+        self:onSyncTimerComplete(data, sender)
+    elseif msgType == "PLAYER_DEATH" then
+        self:onSyncPlayerDeath(data, sender)
+    elseif msgType == "PREPARE_START" then
+        self:onSyncPrepareStart(sender)
+    elseif msgType == "PREPARE_READY" then
+        self:onSyncPrepareReady(sender)
+    elseif msgType == "COUNTDOWN_START" then
+        self:onSyncCountdownStart(data, sender)
+    elseif msgType == "PREPARE_FAILED" then
+        self:onSyncPreparationFailed(data, sender)
+    elseif msgType == "DUNGEON_SELECTED" then
+        self:onSyncDungeonSelected(data, sender)
+    elseif msgType == "READY_CHECK_START" then
+        self:onSyncReadyCheckStart(data, sender)
+    elseif msgType == "READY_CHECK_RESPONSE" then
+        self:onSyncReadyCheckResponse(data, sender)
     end
 end
 
@@ -353,4 +388,147 @@ function TurtleDungeonTimer:getGroupChannel()
         return "PARTY"
     end
     return nil
+end
+
+-- ============================================================================
+-- KILL SYNCHRONIZATION
+-- ============================================================================
+
+-- Broadcast a boss kill to the group
+function TurtleDungeonTimer:broadcastBossKill(bossName)
+    self:sendSyncMessage("BOSS_KILL", bossName)
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Broadcast Boss Kill: " .. bossName)
+    end
+end
+
+-- Broadcast a trash kill to the group
+function TurtleDungeonTimer:broadcastTrashKill(mobName)
+    self:sendSyncMessage("TRASH_KILL", mobName)
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Broadcast Trash Kill: " .. mobName)
+    end
+end
+
+-- Handle received boss kill message
+function TurtleDungeonTimer:onSyncBossKill(bossName, sender)
+    if not bossName or bossName == "" then
+        return
+    end
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received Boss Kill from " .. sender .. ": " .. bossName)
+    end
+    
+    -- Process the boss kill
+    self:onBossKilled(bossName)
+end
+
+-- Handle received trash kill message
+function TurtleDungeonTimer:onSyncTrashKill(mobName, sender)
+    if not mobName or mobName == "" then
+        return
+    end
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received Trash Kill from " .. sender .. ": " .. mobName)
+    end
+    
+    -- Process the trash kill
+    if TDTTrashCounter then
+        TDTTrashCounter:onMobKilled(mobName)
+    end
+end
+
+-- ============================================================================
+-- TIMER START SYNCHRONIZATION
+-- ============================================================================
+
+-- Broadcast timer start to the group
+function TurtleDungeonTimer:broadcastTimerStart()
+    self:sendSyncMessage("TIMER_START")
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Broadcast Timer Start")
+    end
+end
+
+-- Handle received timer start message
+function TurtleDungeonTimer:onSyncTimerStart(sender)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received Timer Start from " .. sender)
+    end
+    
+    -- Start timer if conditions are met
+    self:onCombatStart()
+end
+
+-- Broadcast timer completion to the group
+function TurtleDungeonTimer:broadcastTimerComplete(finalTime)
+    local timeStr = tostring(math.floor(finalTime))
+    self:sendSyncMessage("TIMER_COMPLETE", timeStr)
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Broadcast Timer Complete: " .. timeStr .. "s")
+    end
+end
+
+-- Handle received timer completion message
+function TurtleDungeonTimer:onSyncTimerComplete(timeStr, sender)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received Timer Complete from " .. sender .. ": " .. (timeStr or "nil"))
+    end
+    
+    -- Display completion message
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r |cFF00FF00" .. sender .. " hat den Run abgeschlossen!|r", 1, 1, 0)
+end
+
+-- ============================================================================
+-- PLAYER DEATH SYNCHRONIZATION
+-- ============================================================================
+
+-- Broadcast player death to the group
+function TurtleDungeonTimer:broadcastPlayerDeath(playerName)
+    self:sendSyncMessage("PLAYER_DEATH", playerName)
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Broadcast Player Death: " .. playerName)
+    end
+end
+
+-- Handle received player death message
+function TurtleDungeonTimer:onSyncPlayerDeath(playerName, sender)
+    if not playerName or playerName == "" then
+        return
+    end
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received Player Death from " .. sender .. ": " .. playerName)
+    end
+    
+    -- Process the player death
+    self:onPlayerDeath(playerName)
+end
+
+-- ============================================================================
+-- READY CHECK SYNCHRONIZATION
+-- ============================================================================
+
+function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Ready Check started by: " .. sender .. " with dungeon: " .. tostring(data), 1, 1, 0)
+    end
+    
+    -- data contains the dungeon name
+    local dungeonName = data or ""
+    
+    -- Show ready check prompt to this player with the dungeon name
+    self:showReadyCheckPrompt(dungeonName)
+end
+
+function TurtleDungeonTimer:onSyncReadyCheckResponse(data, sender)
+    -- Forward to preparation module
+    self:onReadyCheckResponse(sender, data)
 end

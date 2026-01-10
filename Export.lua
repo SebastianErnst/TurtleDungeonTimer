@@ -8,6 +8,16 @@ local function mod(a, b)
     return a - math.floor(a / b) * b
 end
 
+-- Generate a UUID v4
+function TurtleDungeonTimer:generateUUID()
+    local template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
+    local uuid = string.gsub(template, "[xy]", function(c)
+        local v = (c == "x") and random(0, 15) or random(8, 11)
+        return string.format("%x", v)
+    end)
+    return uuid
+end
+
 function TurtleDungeonTimer:encodeBase64(data)
     local result = {}
     local i = 1
@@ -43,55 +53,88 @@ function TurtleDungeonTimer:encodeBase64(data)
     return table.concat(result)
 end
 
-function TurtleDungeonTimer:exportRunData()
-    if table.getn(self.killTimes) == 0 then
+-- Unified export function that works with both current run and history entries
+function TurtleDungeonTimer:exportRunData(entry)
+    local killTimes, deathCount, dungeon, variant, playerName, guildName, groupClasses, uuid, hasWorldBuffs
+    
+    if entry then
+        -- Export from history entry
+        killTimes = entry.killTimes or {}
+        deathCount = entry.deathCount or 0
+        dungeon = entry.dungeon
+        variant = entry.variant
+        playerName = entry.playerName
+        guildName = entry.guildName
+        groupClasses = entry.groupClasses
+        uuid = entry.uuid
+        hasWorldBuffs = entry.hasWorldBuffs or false
+    else
+        -- Export from current run
+        killTimes = self.killTimes or {}
+        deathCount = self.deathCount or 0
+        dungeon = self.selectedDungeon
+        variant = self.selectedVariant
+        playerName = self.playerName
+        guildName = self.guildName
+        groupClasses = self.groupClasses
+        uuid = self.currentRunUUID
+        hasWorldBuffs = self.hasWorldBuffs or false
+    end
+    
+    if table.getn(killTimes) == 0 then
         return nil
     end
     
-    -- Build export string: TDT|dungeon|variant|totalTime|deaths|playerName|guildName|classes|boss1:time|boss2:time|...
+    -- Build export string: TDT|uuid|dungeon|variant|totalTime|deaths|playerName|guildName|classes|boss1:time|boss2:time|...
     local parts = {"TDT"}
     
+    -- UUID
+    table.insert(parts, uuid or "no-uuid")
+    
     -- Dungeon name (replace spaces and special chars)
-    local dungeonName = self.selectedDungeon or "Unknown"
+    local dungeonName = dungeon or "Unknown"
     dungeonName = string.gsub(dungeonName, "[%s:]", "_")
     table.insert(parts, dungeonName)
     
     -- Variant
-    local variant = self.selectedVariant or "Default"
-    variant = string.gsub(variant, "[%s:]", "_")
-    table.insert(parts, variant)
+    local variantName = variant or "Default"
+    variantName = string.gsub(variantName, "[%s:]", "_")
+    table.insert(parts, variantName)
     
     -- Total time (last boss kill time)
     local totalTime = 0
-    if table.getn(self.killTimes) > 0 then
-        totalTime = self.killTimes[table.getn(self.killTimes)].time
+    if table.getn(killTimes) > 0 then
+        totalTime = killTimes[table.getn(killTimes)].time
     end
     table.insert(parts, string.format("%.0f", totalTime))
     
     -- Deaths
-    table.insert(parts, tostring(self.deathCount))
+    table.insert(parts, tostring(deathCount))
     
     -- Player name
-    local playerName = self.playerName or "Unknown"
-    playerName = string.gsub(playerName, "[%s:]", "_")
-    table.insert(parts, playerName)
+    local pName = playerName or "Unknown"
+    pName = string.gsub(pName, "[%s:]", "_")
+    table.insert(parts, pName)
     
     -- Guild name
-    local guildName = self.guildName or "No_Guild"
-    guildName = string.gsub(guildName, "[%s:]", "_")
-    table.insert(parts, guildName)
+    local gName = guildName or "No_Guild"
+    gName = string.gsub(gName, "[%s:]", "_")
+    table.insert(parts, gName)
     
     -- Group classes (comma-separated)
     local classesStr = "Solo"
-    if self.groupClasses and table.getn(self.groupClasses) > 0 then
-        classesStr = table.concat(self.groupClasses, ",")
+    if groupClasses and table.getn(groupClasses) > 0 then
+        classesStr = table.concat(groupClasses, ",")
     end
     table.insert(parts, classesStr)
     
+    -- World Buffs indicator (0 = no, 1 = yes)
+    table.insert(parts, hasWorldBuffs and "1" or "0")
+    
     -- Boss times
-    for i = 1, table.getn(self.killTimes) do
-        local bossName = string.gsub(self.killTimes[i].bossName, "[%s:]", "_")
-        local bossTime = string.format("%.0f", self.killTimes[i].time)
+    for i = 1, table.getn(killTimes) do
+        local bossName = string.gsub(killTimes[i].bossName, "[%s:]", "_")
+        local bossTime = string.format("%.0f", killTimes[i].time)
         table.insert(parts, bossName .. ":" .. bossTime)
     end
     
@@ -190,7 +233,7 @@ function TurtleDungeonTimer:showExportDialog()
     end)
     
     scrollFrame:SetScrollChild(editBox)
-    scrollFrame:EnableMouseWheel(true)
+    scrollFrame:EnableMouseWheel()
     scrollFrame:SetScript("OnMouseWheel", function()
         local current = scrollFrame:GetVerticalScroll()
         local maxScroll = scrollFrame:GetVerticalScrollRange()

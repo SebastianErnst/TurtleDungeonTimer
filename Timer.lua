@@ -23,16 +23,36 @@ function TurtleDungeonTimer:start()
         return
     end
     
+    -- Cancel countdown if it's running
+    if self.preparationState == "COUNTDOWN" then
+        self:cancelCountdown()
+    end
+    
     -- Start timer immediately
     self.isRunning = true
     self.startTime = GetTime()
     self.killTimes = {}
     self.deathCount = 0
     
+    -- Generate UUID for this run
+    self.currentRunUUID = self:generateUUID()
+    
     -- Collect player and group info
     self.playerName = UnitName("player") or "Unknown"
     self.guildName = GetGuildInfo("player") or "No Guild"
     self.groupClasses = self:collectGroupClasses()
+    
+    -- Check for world buffs
+    self:checkWorldBuffsOnStart()
+    
+    -- Start trash counter if dungeon has trash data
+    local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon]
+    if dungeonData and dungeonData.trashMobs then
+        TDTTrashCounter:startDungeon(self.selectedDungeon)
+    end
+    
+    -- Disable dungeon selector while running
+    self:setDungeonSelectorEnabled(false)
     
     -- Send chat message to user
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer gestartet!", 1, 1, 0)
@@ -111,8 +131,13 @@ function TurtleDungeonTimer:stop()
     self.isRunning = false
     self.startTime = nil
     
-    -- Sync timer stop with group
-    self:syncTimerStop()
+    -- Stop world buff scanning
+    self:stopWorldBuffScanning()
+    
+    -- Enable dungeon selector again
+    self:setDungeonSelectorEnabled(true)
+    
+    -- TODO: Add syncTimerStop if needed for group sync
     
     -- Update button text
     self:updateStartPauseButton()
@@ -209,12 +234,31 @@ function TurtleDungeonTimer:performResetDirect()
     self.deathCount = 0
     self.startTime = nil
     self.currentRunId = nil
+    self.hasWorldBuffs = false
+    self.hasCheckedWorldBuffs = false
+    self.worldBuffPlayers = {}
+    
+    -- Reset all boss defeated flags
+    for i = 1, table.getn(self.bossList) do
+        if type(self.bossList[i]) == "table" then
+            self.bossList[i].defeated = false
+        end
+    end
+    
+    -- Stop world buff scanning
+    self:stopWorldBuffScanning()
+    
+    -- Reset trash counter
+    TDTTrashCounter:stopDungeon()
     
     -- Clear last run from database
     TurtleDungeonTimerDB.lastRun = {}
     
     -- Reset UI
     self:resetUI()
+    
+    -- Enable dungeon selector again
+    self:setDungeonSelectorEnabled(true)
     
     -- Update button text
     self:updateStartPauseButton()
@@ -227,9 +271,22 @@ function TurtleDungeonTimer:performResetSilent()
     -- Silent reset without sync (used by sync system)
     self.isRunning = false
     self.killTimes = {}
+    
+    -- Reset all boss defeated flags
+    for i = 1, table.getn(self.bossList) do
+        if type(self.bossList[i]) == "table" then
+            self.bossList[i].defeated = false
+        end
+    end
+    
+    -- Stop world buff scanning
+    self:stopWorldBuffScanning()
     self.deathCount = 0
     self.startTime = nil
     self.currentRunId = nil  -- Clear run ID on reset
+    self.hasWorldBuffs = false
+    self.hasCheckedWorldBuffs = false
+    self.worldBuffPlayers = {}
     
     -- Clear last run from database
     TurtleDungeonTimerDB.lastRun = {}
@@ -361,7 +418,14 @@ function TurtleDungeonTimer:setupUpdateLoop()
     if self.updateFrame then return end
     
     self.updateFrame = CreateFrame("Frame")
+    self.updateFrame.lastUpdate = 0
     self.updateFrame:SetScript("OnUpdate", function()
+        -- Throttle updates to once per 0.1 seconds (10 times/sec instead of 60+)
+        local now = GetTime()
+        if now - this.lastUpdate < 0.1 then
+            return
+        end
+        this.lastUpdate = now
         TurtleDungeonTimer:getInstance():updateTimer()
     end)
 end
@@ -390,6 +454,15 @@ function TurtleDungeonTimer:updateTimer()
     
     -- Update death count
     if self.frame.deathText then
-        self.frame.deathText:SetText("Deaths: " .. self.deathCount)
+        self.frame.deathText:SetText("" .. self.deathCount)
+    end
+    
+    -- Update world buff indicator
+    if self.frame.worldBuffText then
+        if self.hasWorldBuffs then
+            self.frame.worldBuffText:SetText("[WB]")
+        else
+            self.frame.worldBuffText:SetText("")
+        end
     end
 end
