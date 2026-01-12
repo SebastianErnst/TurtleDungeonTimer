@@ -42,7 +42,7 @@ local function buildTrashLookup(dungeonData)
     
     -- Second pass: Calculate weighted average
     for name, data in pairs(nameData) do
-        lookup[name] = floor(data.totalHP / data.totalCount)
+        lookup[name] = data.totalHP / data.totalCount
     end
     
     return lookup
@@ -68,9 +68,10 @@ local function calculateNormalizedProgress()
     
     -- Normalize to requirement: progress / required * 100
     -- Example: 25% of 50% required = 50% on bar
+    -- Note: Can exceed 100% to show overage
     local normalized = (progress / required) * 100
     
-    return math.min(normalized, 100)  -- Cap at 100%
+    return normalized
 end
 
 -- Get color based on normalized progress
@@ -171,13 +172,7 @@ function TDTTrashCounter:stopDungeon()
 end
 
 function TDTTrashCounter:hideTrashBar()
-    -- Hide the trash progress bar in timer UI
-    local timerFrame = TurtleDungeonTimer:getInstance().frame
-    if timerFrame then
-        if timerFrame.trashProgressBG then timerFrame.trashProgressBG:Hide() end
-        if timerFrame.trashProgressBar then timerFrame.trashProgressBar:Hide() end
-        if timerFrame.trashProgressText then timerFrame.trashProgressText:Hide() end
-    end
+    -- Not needed - progress bar is part of main UI now
 end
 
 function TDTTrashCounter:resetProgress(dungeonName)
@@ -188,6 +183,49 @@ function TDTTrashCounter:resetProgress(dungeonName)
     if currentDungeon then
         killedTrashHP = 0
         self:updateUI()
+    end
+end
+
+function TDTTrashCounter:addTrashHP(hp)
+    killedTrashHP = killedTrashHP + hp
+    self:updateUI()
+    self:checkRunCompletion()
+end
+
+function TDTTrashCounter:checkRunCompletion()
+    if not currentDungeon then
+        return
+    end
+    
+    local progress = calculateProgress()
+    local required = currentDungeon.trashRequiredPercent or 100
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "|cFF00FF00[TDT Trash Debug]|r checkRunCompletion: progress=%.4f, required=%d, killedHP=%d, totalHP=%d",
+            progress, required, killedTrashHP, currentDungeon.totalTrashHP
+        ))
+    end
+    
+    if progress >= required then
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "|cFF00FF00[TDT Trash]|r |cFF00FF00Trash requirement completed! (%d%% cleared)|r",
+            floor(progress)
+        ))
+        
+        -- Check if all bosses are also dead - if so, complete the run
+        local timer = TurtleDungeonTimer:getInstance()
+        if timer.isRunning then
+            local requiredBosses = timer:getRequiredBossCount()
+            local requiredKills = timer:getRequiredBossKills()
+            if requiredKills >= requiredBosses then
+                -- Both bosses and trash complete!
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Alle Bosse UND Trash erledigt - Run abgeschlossen!")
+                timer:onAllBossesDefeated()
+            else
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Trash erledigt! Noch " .. (requiredBosses - requiredKills) .. " Bosse übrig.")
+            end
+        end
     end
 end
 
@@ -225,23 +263,7 @@ function TDTTrashCounter:onMobKilled(mobName)
     end
     
     -- Check if requirement met
-    if progress >= required then
-        DEFAULT_CHAT_FRAME:AddMessage(string.format(
-            "|cFF00FF00[TDT Trash]|r |cFF00FF00Trash requirement completed! (%d%% cleared)|r",
-            floor(progress)
-        ))
-        
-        -- Check if all bosses are also dead - if so, complete the run
-        local timer = TurtleDungeonTimer:getInstance()
-        if timer.isRunning then
-            local requiredBosses = timer:getRequiredBossCount()
-            local requiredKills = timer:getRequiredBossKills()
-            if requiredKills >= requiredBosses then
-                -- Both bosses and trash complete!
-                timer:onAllBossesDefeated()
-            end
-        end
-    end
+    self:checkRunCompletion()
     
     -- Update UI (throttled)
     local currentTime = GetTime()
@@ -384,40 +406,8 @@ function TDTTrashCounter:updateUI()
         end
     end
     
-    -- Update main timer UI trash progress bar
-    local timerFrame = TurtleDungeonTimer:getInstance().frame
-    if timerFrame and timerFrame.trashProgressBar then
-        if not currentDungeon then
-            -- Hide trash progress if no dungeon with trash data
-            if timerFrame.trashProgressBG then timerFrame.trashProgressBG:Hide() end
-            if timerFrame.trashProgressBar then timerFrame.trashProgressBar:Hide() end
-            if timerFrame.trashProgressText then timerFrame.trashProgressText:Hide() end
-            return
-        end
-        
-        -- Show trash progress
-        if timerFrame.trashProgressBG then timerFrame.trashProgressBG:Show() end
-        if timerFrame.trashProgressBar then timerFrame.trashProgressBar:Show() end
-        if timerFrame.trashProgressText then timerFrame.trashProgressText:Show() end
-        
-        local normalizedProgress = calculateNormalizedProgress()
-        local r, g, b = getProgressColor(normalizedProgress)
-        
-        -- Update bar width (max 140 pixels, based on normalized progress)
-        local barWidth = (normalizedProgress / 100) * 140
-        timerFrame.trashProgressBar:SetWidth(math.max(1, barWidth))
-        timerFrame.trashProgressBar:SetTexture(r, g, b, 0.7)
-        
-        -- Update text (show normalized progress as percentage)
-        timerFrame.trashProgressText:SetText(string.format("%d%%", floor(normalizedProgress)))
-        
-        -- Color text
-        if normalizedProgress >= 100 then
-            timerFrame.trashProgressText:SetTextColor(0, 1, 0)  -- Green
-        else
-            timerFrame.trashProgressText:SetTextColor(1, 1, 1)  -- White
-        end
-    end
+    -- Main timer UI is updated via TurtleDungeonTimer:updateProgressBar()
+    -- which calls TDTTrashCounter:getProgress()
 end
 
 -- ============================================================================

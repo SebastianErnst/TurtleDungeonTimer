@@ -312,7 +312,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    ResetInstances()
+    -- ResetInstances()
     DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[TESTING]|r Reset übersprungen (5/Stunde Limit)", 1, 0.6, 0)
     
     -- Wait a moment for system message (or just simulate success)

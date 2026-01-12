@@ -199,11 +199,8 @@ function TurtleDungeonTimer:onAllBossesDefeated()
     self.isRunning = false
     local finalTime = GetTime() - self.startTime
     
-    -- Force progress bar to 100%
-    if self.frame and self.frame.progressBar and self.frame.progressText then
-        self.frame.progressBar:SetWidth(218)
-        self.frame.progressText:SetText("100%")
-    end
+    -- Update progress bar (shows 100% or 100% (+x%) if overage)
+    self:updateProgressBar()
     
     -- Broadcast timer completion to group
     self:broadcastTimerComplete(finalTime)

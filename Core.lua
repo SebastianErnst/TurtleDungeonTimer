@@ -231,6 +231,12 @@ end
 function TurtleDungeonTimer:saveLastRun()
     if not self.selectedDungeon or not self.selectedVariant then return end
     
+    -- Get current trash progress
+    local trashProgress, trashKilledHP = 0, 0
+    if TDTTrashCounter then
+        trashProgress, trashKilledHP = TDTTrashCounter:getProgress()
+    end
+    
     TurtleDungeonTimerDB.lastRun = {
         dungeon = self.selectedDungeon,
         variant = self.selectedVariant,
@@ -242,12 +248,23 @@ function TurtleDungeonTimer:saveLastRun()
         guildName = self.guildName,
         groupClasses = self.groupClasses,
         hasWorldBuffs = self.hasWorldBuffs or false,
-        worldBuffPlayers = self.worldBuffPlayers or {}
+        worldBuffPlayers = self.worldBuffPlayers or {},
+        trashProgress = trashProgress,
+        trashKilledHP = trashKilledHP
     }
 end
 
 function TurtleDungeonTimer:saveToHistory(finalTime, completed)
     if not self.selectedDungeon or not self.selectedVariant then return end
+    
+    -- Get trash progress if available
+    local trashProgress = 0
+    local trashRequired = 100
+    local dungeonData = self.DUNGEON_DATA[self.selectedDungeon]
+    if dungeonData and dungeonData.trashMobs then
+        trashProgress = TDTTrashCounter:getProgress()
+        trashRequired = dungeonData.trashRequiredPercent or 100
+    end
     
     local historyEntry = {
         uuid = self.currentRunUUID or self:generateUUID(),
@@ -263,7 +280,9 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
         guildName = self.guildName or "No Guild",
         groupClasses = self.groupClasses or {},
         hasWorldBuffs = self.hasWorldBuffs or false,
-        worldBuffPlayers = self.worldBuffPlayers or {}
+        worldBuffPlayers = self.worldBuffPlayers or {},
+        trashProgress = trashProgress,
+        trashRequired = trashRequired
     }
     
     -- Add to beginning of history
@@ -289,6 +308,12 @@ function TurtleDungeonTimer:restoreLastRun()
         self.hasWorldBuffs = lastRun.hasWorldBuffs or false
         self.worldBuffPlayers = lastRun.worldBuffPlayers or {}
         
+        -- Restore trash counter if available
+        if lastRun.trashKilledHP and lastRun.trashKilledHP > 0 then
+            TDTTrashCounter:prepareDungeon(lastRun.dungeon)
+            TDTTrashCounter:addTrashHP(lastRun.trashKilledHP)
+        end
+        
         -- Update UI with saved data
         if self.frame then
             -- Update death counter
@@ -296,23 +321,16 @@ function TurtleDungeonTimer:restoreLastRun()
                 self.frame.deathText:SetText("" .. self.deathCount)
             end
             
-            -- Update total time from last kill
-            if table.getn(self.killTimes) > 0 and self.frame.timeText then
+            -- Update timer display from last kill
+            if table.getn(self.killTimes) > 0 and self.frame.timerText then
                 local finalTime = self.killTimes[table.getn(self.killTimes)].time
-                self.frame.timeText:SetText(self:formatTime(finalTime))
-                
-                -- Set color based on comparison with best time
-                local bestTime = self:getBestTime()
-                if bestTime then
-                    if finalTime < bestTime.time then
-                        self.frame.timeText:SetTextColor(0, 1, 0) -- Green = better than best
-                    else
-                        self.frame.timeText:SetTextColor(1, 0.5, 0.5) -- Red = worse than best
-                    end
-                else
-                    self.frame.timeText:SetTextColor(1, 1, 1) -- White = no best time
-                end
+                local minutes = math.floor(finalTime / 60)
+                local seconds = finalTime - (minutes * 60)
+                self.frame.timerText:SetText(string.format("%02d:%02d", minutes, seconds))
             end
+            
+            -- Update progress bar (shows trash progress including +x%)
+            self:updateProgressBar()
             
             -- Update boss rows with kill times
             for i = 1, table.getn(self.killTimes) do

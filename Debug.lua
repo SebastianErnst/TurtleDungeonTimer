@@ -96,374 +96,65 @@ function TurtleDungeonTimer:createDebugFrame()
         return btn
     end
     
-    -- Timer Controls
-    createButton("START Timer", function()
-        TurtleDungeonTimer:getInstance():start()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer gestartet")
-    end)
-    
-    createButton("STOP Timer", function()
-        TurtleDungeonTimer:getInstance():stop()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer gestoppt")
-    end)
-    
-    createButton("RESET Timer (Direct)", function()
-        TurtleDungeonTimer:getInstance():performResetDirect()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer zurückgesetzt")
-    end)
-    
-    -- World Buff Testing
-    createButton("Scan World Buffs NOW", function()
+    -- === MAIN CONTROLS ===
+    createButton("Start/Reset Dungeon", function()
         local timer = TurtleDungeonTimer:getInstance()
-        
-        -- Do the actual world buff scan
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r === WORLD BUFF SCAN ===")
-        timer:markRunWithWorldBuffs()
-        
-        -- Print results immediately
-        if timer.worldBuffPlayers and next(timer.worldBuffPlayers) then
-            local count = 0
-            for player, buff in pairs(timer.worldBuffPlayers) do
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r  " .. player .. ": " .. buff)
-                count = count + 1
-            end
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Total: " .. count .. " players with world buffs")
+        if timer.isRunning then
+            timer:performResetDirect()
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon zurückgesetzt")
         else
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r No world buffs found")
-        end
-    end)
-    
-    createButton("Print World Buff Status", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r hasWorldBuffs: " .. tostring(timer.hasWorldBuffs))
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r hasCheckedWorldBuffs: " .. tostring(timer.hasCheckedWorldBuffs))
-        if timer.worldBuffPlayers then
-            local count = 0
-            for player, buff in pairs(timer.worldBuffPlayers) do
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r  " .. player .. ": " .. buff)
-                count = count + 1
+            if timer:isGroupLeader() then
+                timer:startPreparation()
+            else
+                timer:start()
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer gestartet")
             end
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Total players with buffs: " .. count)
         end
     end)
     
-    -- Boss Testing
-    createButton("Fake Boss Kill (First Boss)", function()
+    createButton("Start Countdown (10s)", function()
         local timer = TurtleDungeonTimer:getInstance()
-        
+        if timer.isRunning then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer läuft bereits!")
+            return
+        end
         if not timer.selectedDungeon or not timer.selectedVariant then
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
             return
         end
         
-        if table.getn(timer.bossList) == 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Bosse geladen!")
-            return
-        end
-        
-        local boss = timer.bossList[1]
-        if not boss or type(boss) ~= "table" then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Boss data invalid!")
-            return
-        end
-        
-        if boss.defeated then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Boss bereits besiegt!")
-            return
-        end
-        
-        local currentTime = GetTime()
-        local elapsedTime = 0
-        if timer.startTime then
-            elapsedTime = currentTime - timer.startTime
-        else
-            elapsedTime = 60 -- 1 minute default if no timer
-        end
-        
-        local lastKillTime = 0
-        if table.getn(timer.killTimes) > 0 then
-            lastKillTime = timer.killTimes[table.getn(timer.killTimes)].time
-        end
-        local splitTime = elapsedTime - lastKillTime
-        
-        table.insert(timer.killTimes, {
-            bossName = boss.name,
-            time = elapsedTime,
-            splitTime = splitTime
-        })
-        
-        boss.defeated = true
-        
-        -- Update boss row UI using the official function
-        timer:updateBossRow(1, elapsedTime, splitTime)
-        
-        timer:saveLastRun()
-        
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Fake Boss Kill: " .. tostring(boss.name) .. " (" .. timer:formatTime(elapsedTime) .. ")")
-        
-        -- Check if all required bosses are defeated
-        local requiredBosses = timer:getRequiredBossCount()
-        local requiredKills = timer:getRequiredBossKills()
-        if requiredKills >= requiredBosses then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Alle required Bosse defeated!")
-            timer:onAllBossesDefeated()
-        end
+        -- Start countdown as if we entered the zone
+        timer:startCountdown(UnitName("player"))
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Countdown gestartet!")
     end)
     
-    createButton("Fake ALL Boss Kills", function()
+    createButton("Start Timer Immediately", function()
         local timer = TurtleDungeonTimer:getInstance()
-        
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r === FAKE ALL BOSS KILLS ===")
-        
-        if not timer.selectedDungeon or timer.selectedDungeon == "" then
-            DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Error: Kein Dungeon ausgewählt!")
+        if timer.isRunning then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer läuft bereits!")
             return
         end
-        DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Dungeon: " .. timer.selectedDungeon)
-        
-        if table.getn(timer.bossList) == 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Error: Boss-Liste ist leer!")
-            return
-        end
-        DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Bosses: " .. table.getn(timer.bossList))
-        
-        if not timer.isRunning then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFFAA00[DEBUG]|r Timer nicht aktiv - starte Timer...")
-            timer:start()
-        end
-        DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Timer running: " .. tostring(timer.isRunning))
-        
-        local currentTime = GetTime()
-        local baseTime = timer.startTime or currentTime
-        local bossInterval = 30 -- 30 Sekunden zwischen Bosskills
-        
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Beginne Boss Kills...")
-        
-        for i = 1, table.getn(timer.bossList) do
-            local boss = timer.bossList[i]
-            
-            if type(boss) ~= "table" then
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Boss " .. i .. " hat falsches Format: " .. type(boss))
-                break
-            end
-            
-            DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Boss " .. i .. ": " .. boss.name .. " (defeated=" .. tostring(boss.defeated) .. ")")
-            
-            if not boss.defeated then
-                local elapsedTime = (currentTime - baseTime) + (i * bossInterval)
-                local lastKillTime = 0
-                if table.getn(timer.killTimes) > 0 then
-                    lastKillTime = timer.killTimes[table.getn(timer.killTimes)].time
-                end
-                local splitTime = elapsedTime - lastKillTime
-                
-                table.insert(timer.killTimes, {
-                    bossName = boss.name,
-                    time = elapsedTime,
-                    splitTime = splitTime
-                })
-                
-                boss.defeated = true
-                timer:updateBossRow(i, elapsedTime, splitTime)
-                
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r " .. i .. ". " .. boss.name .. " killed @ " .. timer:formatTime(elapsedTime))
-            else
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFFAA00[DEBUG]|r " .. i .. ". " .. boss.name .. " already defeated, skipping")
-            end
-        end
-        
-        timer:saveLastRun()
-        
-        -- Check if all required bosses are defeated
-        local requiredBosses = timer:getRequiredBossCount()
-        local requiredKills = timer:getRequiredBossKills()
-        DEFAULT_CHAT_FRAME:AddMessage("[DEBUG] Required: " .. requiredBosses .. ", Kills: " .. requiredKills)
-        if requiredKills >= requiredBosses then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Alle required Bosse defeated! Run completed!")
-            timer:onAllBossesDefeated()
-        end
-    end)
-    
-    createButton("Fake Death", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        timer.deathCount = timer.deathCount + 1
-        if timer.frame and timer.frame.deathText then
-            timer.frame.deathText:SetText("" .. timer.deathCount)
-        end
-        timer:saveLastRun()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Fake Death hinzugefügt. Total: " .. timer.deathCount)
-    end)
-    
-    -- State Debugging
-    createButton("Print Current State", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r === CURRENT STATE ===")
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r isRunning: " .. tostring(timer.isRunning))
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r selectedDungeon: " .. tostring(timer.selectedDungeon))
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r selectedVariant: " .. tostring(timer.selectedVariant))
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r deathCount: " .. tostring(timer.deathCount))
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r killTimes count: " .. table.getn(timer.killTimes))
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r bossList count: " .. table.getn(timer.bossList))
-        if timer.startTime then
-            local elapsed = GetTime() - timer.startTime
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Elapsed time: " .. string.format("%.1f", elapsed) .. "s")
-        end
-    end)
-    
-    createButton("Print Boss List", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r === BOSS LIST ===")
-        if table.getn(timer.bossList) == 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Bosse geladen!")
+        if not timer.selectedDungeon or not timer.selectedVariant then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
             return
         end
         
-        -- Check format
-        local firstBoss = timer.bossList[1]
-        local format = type(firstBoss)
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Format: " .. format .. " (" .. table.getn(timer.bossList) .. " Bosse)")
-        
-        for i = 1, table.getn(timer.bossList) do
-            local boss = timer.bossList[i]
-            
-            if type(boss) == "string" then
-                -- Old format - just strings
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFFAA00[DEBUG]|r " .. i .. ". " .. boss .. " |cFFFF0000[OLD STRING FORMAT - RELOAD NEEDED!]|r")
-            elseif type(boss) == "table" then
-                -- New format - proper tables
-                local status = boss.defeated and "[DEFEATED]" or "[ALIVE]"
-                local optional = boss.optional and "[OPTIONAL]" or "[REQUIRED]"
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r " .. i .. ". " .. tostring(boss.name) .. " " .. status .. " " .. optional)
-            else
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. i .. ". UNKNOWN TYPE: " .. type(boss))
-            end
-        end
+        -- Start timer directly
+        timer:start()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer direkt gestartet!")
     end)
     
-    -- UI Testing
-    createButton("Toggle Main Frame", function()
-        TurtleDungeonTimer:getInstance():toggleWindow()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Main Frame toggled")
+    createButton("Open Trash List Window", function()
+        TDTTrashScanner:showListWindow()
     end)
-    
-    createButton("Toggle Minimize", function()
-        TurtleDungeonTimer:getInstance():toggleMinimized()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Minimize toggled")
-    end)
-    
-    createButton("Reset UI", function()
-        TurtleDungeonTimer:getInstance():resetUI()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r UI zurückgesetzt")
-    end)
-    
-    -- Export/History Testing
-    createButton("Test Export", function()
-        TurtleDungeonTimer:getInstance():showExportDialog()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Export Dialog geöffnet")
-    end)
-    
-    createButton("Force Save to History", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        if table.getn(timer.killTimes) > 0 then
-            local finalTime = timer.killTimes[table.getn(timer.killTimes)].time
-            timer:saveToHistory(finalTime, true)
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Run in Historie gespeichert")
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Kill-Daten zum Speichern!")
-        end
-    end)
-    
-    -- === TRASH SCANNER SECTION ===
-    createButton("", function() end) -- Spacer
-    
-    createButton("SCAN Current Target", function()
-        TDTTrashScanner:scanCurrentTarget()
-    end)
-    
-    createButton("Show Trash List Window", function()
+    createButton("Open Trash List Window", function()
         TDTTrashScanner:showListWindow()
     end)
     
-    createButton("Show Trash Stats", function()
-        TDTTrashScanner:showStats()
-    end)
-    
-    createButton("EXPORT Trash Data", function()
-        TDTTrashScanner:exportToChat()
-    end)
-    
-    createButton("Clear Current Dungeon", function()
-        TDTTrashScanner:clearCurrentDungeon()
-    end)
-    
-    createButton("Clear ALL Trash Data", function()
-        TDTTrashScanner:clearAllData()
-    end)
-    
-    -- Trash Counter Debug
-    createButton("Start Trash Counter", function()
-        TDTTrashCounter:debugStart("The Stockade")
-    end)
-    
-    createButton("Kill Test Mob", function()
-        TDTTrashCounter:debugKill("Defias Prisoner")
-    end)
-    
-    createButton("Show Trash Progress", function()
-        TDTTrashCounter:debugShow()
-    end)
-    
-    createButton("Toggle Progress UI", function()
-        if TDTTrashCounter.progressFrame and TDTTrashCounter.progressFrame:IsVisible() then
-            TDTTrashCounter:hideUI()
-        else
-            TDTTrashCounter:showUI()
-        end
-    end)
-    
-    createButton("Show History Dropdown", function()
-        TurtleDungeonTimer:getInstance():updateHistoryDropdown()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r History Dropdown aktualisiert")
-    end)
-    
-    -- SavedVariables Testing
-    createButton("Print SavedVariables", function()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r === SAVED VARIABLES ===")
-        if TurtleDungeonTimerDB then
-            if TurtleDungeonTimerDB.lastRun then
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r lastRun exists")
-            end
-            if TurtleDungeonTimerDB.history then
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r history entries: " .. table.getn(TurtleDungeonTimerDB.history))
-            end
-            if TurtleDungeonTimerDB.bestTimes then
-                local count = 0
-                for _ in pairs(TurtleDungeonTimerDB.bestTimes) do
-                    count = count + 1
-                end
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r bestTimes dungeons: " .. count)
-            end
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r TurtleDungeonTimerDB not found!")
-        end
-    end)
-    
-    createButton("Clear History", function()
-        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.history then
-            TurtleDungeonTimerDB.history = {}
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Historie geleert")
-        end
-    end)
-    
-    createButton("Clear Best Times", function()
-        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.bestTimes then
-            TurtleDungeonTimerDB.bestTimes = {}
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Best Times geleert")
-        end
-    end)
-    
-    -- Group Testing
-    createButton("Print Group Info", function()
+    createButton("Group Status", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r === GROUP STATUS ===")
+        
         local raid = GetNumRaidMembers()
         local party = GetNumPartyMembers()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Raid Members: " .. raid)
@@ -483,35 +174,279 @@ function TurtleDungeonTimer:createDebugFrame()
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Solo")
         end
-    end)
-    
-    createButton("Check Addon Users", function()
-        TurtleDungeonTimer:getInstance():checkForAddons()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Addon-Check gesendet")
-    end)
-    
-    createButton("Print Addon Users", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        local count = timer:getAddonUserCount()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Addon Users: " .. count)
-        for player, _ in pairs(timer.playersWithAddon) do
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r  " .. player)
+        
+        -- World Buffs
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r === WORLD BUFFS ===")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r hasWorldBuffs: " .. tostring(timer.hasWorldBuffs))
+        if timer.worldBuffPlayers and next(timer.worldBuffPlayers) then
+            local count = 0
+            for player, buff in pairs(timer.worldBuffPlayers) do
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r  " .. player .. ": " .. buff)
+                count = count + 1
+            end
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Total: " .. count .. " players with world buffs")
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r No world buffs detected")
         end
     end)
     
-    -- UUID Testing
-    createButton("Generate UUID", function()
-        local uuid = TurtleDungeonTimer:getInstance():generateUUID()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Generated UUID: " .. uuid)
+    -- === TRASH DEBUG ===
+    createButton("Add 1% Trash", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        if not timer.selectedDungeon then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            return
+        end
+        local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
+        if not dungeonData or not dungeonData.trashMobs then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Trash-Daten!")
+            return
+        end
+        
+        -- Ensure trash counter is started
+        if not timer.isRunning then
+            TDTTrashCounter:prepareDungeon(timer.selectedDungeon)
+        end
+        
+        local requiredPercent = dungeonData.trashRequiredPercent or 100
+        local addHP = (dungeonData.totalTrashHP * requiredPercent / 100) * 0.01
+        TDTTrashCounter:addTrashHP(addHP)
+        local progress = TDTTrashCounter:getProgress()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +1% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
     end)
     
-    -- Utility
-    createButton("Reload UI", function()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Reloading UI in 2 seconds...")
+    createButton("Add 5% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
-        timer:ScheduleTimer(function()
-            ReloadUI()
-        end, 2, false)
+        if not timer.selectedDungeon then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            return
+        end
+        local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
+        if not dungeonData or not dungeonData.trashMobs then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Trash-Daten!")
+            return
+        end
+        
+        -- Ensure trash counter is started
+        if not timer.isRunning then
+            TDTTrashCounter:prepareDungeon(timer.selectedDungeon)
+        end
+        
+        local requiredPercent = dungeonData.trashRequiredPercent or 100
+        local addHP = (dungeonData.totalTrashHP * requiredPercent / 100) * 0.05
+        TDTTrashCounter:addTrashHP(addHP)
+        local progress = TDTTrashCounter:getProgress()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +5% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
+    end)
+    
+    createButton("Add 100% Trash", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        if not timer.selectedDungeon then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            return
+        end
+        local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
+        if not dungeonData or not dungeonData.trashMobs then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Trash-Daten!")
+            return
+        end
+        
+        -- Ensure trash counter is started
+        if not timer.isRunning then
+            TDTTrashCounter:prepareDungeon(timer.selectedDungeon)
+        end
+        
+        local requiredPercent = dungeonData.trashRequiredPercent or 100
+        local addHP = (dungeonData.totalTrashHP * requiredPercent / 100) * 1.0
+        TDTTrashCounter:addTrashHP(addHP)
+        local progress = TDTTrashCounter:getProgress()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +100% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
+    end)
+    
+    -- === BOSS DEBUG ===
+    createButton("Kill One Random Boss", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        
+        if not timer.selectedDungeon or not timer.selectedVariant then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            return
+        end
+        
+        if table.getn(timer.bossList) == 0 then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Bosse geladen!")
+            return
+        end
+        
+        -- Find random alive boss
+        local aliveBosses = {}
+        for i = 1, table.getn(timer.bossList) do
+            local boss = timer.bossList[i]
+            if type(boss) == "table" and not boss.defeated then
+                table.insert(aliveBosses, {index = i, boss = boss})
+            end
+        end
+        
+        if table.getn(aliveBosses) == 0 then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Alle Bosse bereits tot!")
+            return
+        end
+        
+        local randomIndex = math.random(1, table.getn(aliveBosses))
+        local selected = aliveBosses[randomIndex]
+        local bossIndex = selected.index
+        local boss = selected.boss
+        
+        if not timer.isRunning then
+            timer:start()
+        end
+        
+        local currentTime = GetTime()
+        local elapsedTime = currentTime - (timer.startTime or currentTime)
+        
+        local lastKillTime = 0
+        if table.getn(timer.killTimes) > 0 then
+            lastKillTime = timer.killTimes[table.getn(timer.killTimes)].time
+        end
+        local splitTime = elapsedTime - lastKillTime
+        
+        table.insert(timer.killTimes, {
+            bossName = boss.name,
+            time = elapsedTime,
+            splitTime = splitTime,
+            index = bossIndex
+        })
+        
+        boss.defeated = true
+        timer:updateBossRow(bossIndex, elapsedTime, splitTime)
+        timer:saveLastRun()
+        
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Boss killed: " .. boss.name .. " @ " .. timer:formatTime(elapsedTime))
+        
+        -- Check if all required bosses are defeated AND trigger trash check
+        local requiredBosses = timer:getRequiredBossCount()
+        local requiredKills = timer:getRequiredBossKills()
+        if requiredKills >= requiredBosses then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Alle required Bosse defeated!")
+            -- Trigger trash check to see if run is complete
+            TDTTrashCounter:checkRunCompletion()
+        end
+    end)
+    
+    createButton("Kill All Bosses", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        
+        if not timer.selectedDungeon or not timer.selectedVariant then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            return
+        end
+        
+        if table.getn(timer.bossList) == 0 then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Bosse geladen!")
+            return
+        end
+        
+        if not timer.isRunning then
+            timer:start()
+        end
+        
+        local currentTime = GetTime()
+        local baseTime = timer.startTime or currentTime
+        local bossInterval = 30 -- 30 seconds between boss kills
+        
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Töte alle Bosse...")
+        
+        for i = 1, table.getn(timer.bossList) do
+            local boss = timer.bossList[i]
+            
+            if type(boss) == "table" and not boss.defeated then
+                local elapsedTime = (currentTime - baseTime) + (i * bossInterval)
+                local lastKillTime = 0
+                if table.getn(timer.killTimes) > 0 then
+                    lastKillTime = timer.killTimes[table.getn(timer.killTimes)].time
+                end
+                local splitTime = elapsedTime - lastKillTime
+                
+                table.insert(timer.killTimes, {
+                    bossName = boss.name,
+                    time = elapsedTime,
+                    splitTime = splitTime,
+                    index = i
+                })
+                
+                boss.defeated = true
+                timer:updateBossRow(i, elapsedTime, splitTime)
+                
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r " .. boss.name .. " @ " .. timer:formatTime(elapsedTime))
+            end
+        end
+        
+        timer:saveLastRun()
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Alle Bosse getötet!")
+        
+        -- Trigger trash check to see if run is complete
+        TDTTrashCounter:checkRunCompletion()
+    end)
+    
+    createButton("Finish Run", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        
+        if not timer.selectedDungeon then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            return
+        end
+        
+        -- Start timer if not running
+        if not timer.isRunning then
+            timer:start()
+        end
+        
+        -- Set trash to 100%
+        local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
+        if dungeonData and dungeonData.trashMobs then
+            local requiredPercent = dungeonData.trashRequiredPercent or 100
+            local targetHP = (dungeonData.totalTrashHP * requiredPercent / 100)
+            -- Reset first, then add
+            TDTTrashCounter:resetProgress(timer.selectedDungeon)
+            TDTTrashCounter:addTrashHP(targetHP)
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Trash auf 100% gesetzt")
+        end
+        
+        -- Kill all bosses
+        if table.getn(timer.bossList) > 0 then
+            local currentTime = GetTime()
+            local baseTime = timer.startTime or currentTime
+            local bossInterval = 30
+            
+            for i = 1, table.getn(timer.bossList) do
+                local boss = timer.bossList[i]
+                
+                if type(boss) == "table" and not boss.defeated then
+                    local elapsedTime = (currentTime - baseTime) + (i * bossInterval)
+                    local lastKillTime = 0
+                    if table.getn(timer.killTimes) > 0 then
+                        lastKillTime = timer.killTimes[table.getn(timer.killTimes)].time
+                    end
+                    local splitTime = elapsedTime - lastKillTime
+                    
+                    table.insert(timer.killTimes, {
+                        bossName = boss.name,
+                        time = elapsedTime,
+                        splitTime = splitTime,
+                        index = i
+                    })
+                    
+                    boss.defeated = true
+                    timer:updateBossRow(i, elapsedTime, splitTime)
+                end
+            end
+        end
+        
+        timer:saveLastRun()
+        
+        -- Trigger completion
+        timer:onAllBossesDefeated()
+        
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Run abgeschlossen!")
     end)
     
     -- Update scroll child height

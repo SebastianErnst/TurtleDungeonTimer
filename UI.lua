@@ -449,7 +449,7 @@ function TurtleDungeonTimer:createProgressBar()
     progressText:SetPoint("CENTER", progressBg, "CENTER", 0, 0)
     progressText:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
     progressText:SetTextColor(1, 1, 1)
-    progressText:SetText("0%")
+    progressText:SetText("0.00%")
     self.frame.progressText = progressText
 
     -- Collapse/Expand button (arrow)
@@ -576,17 +576,27 @@ function TurtleDungeonTimer:updateBossRows()
     
     -- Initialize bossRows if needed (only create once!)
     if needsRecreate then
-        -- Clean up old rows if count changed
+        -- Clean up ALL children of bossContainer to remove old boss text
+        if self.frame.bossContainer then
+            local children = {self.frame.bossContainer:GetChildren()}
+            for _, child in ipairs(children) do
+                child:Hide()
+                child:SetParent(nil)
+            end
+            
+            -- Also clean up font strings
+            local regions = {self.frame.bossContainer:GetRegions()}
+            for _, region in ipairs(regions) do
+                if region.Hide then
+                    region:Hide()
+                end
+            end
+        end
+        
+        -- Clean up old rows table
         if self.frame.bossRows then
             for i = 1, table.getn(self.frame.bossRows) do
-                if self.frame.bossRows[i] then
-                    if self.frame.bossRows[i].name then
-                        self.frame.bossRows[i].name:Hide()
-                    end
-                    if self.frame.bossRows[i].time then
-                        self.frame.bossRows[i].time:Hide()
-                    end
-                end
+                self.frame.bossRows[i] = nil
             end
         end
         
@@ -743,10 +753,28 @@ function TurtleDungeonTimer:updateProgressBar()
     if not self.frame or not self.frame.progressBar then return end
 
     local progress = TDTTrashCounter:getProgress()
-    local width = 218 * (progress / 100)
-
+    
+    -- Cap bar width at 100%
+    local cappedProgress = math.min(progress, 100)
+    local width = 218 * (cappedProgress / 100)
     self.frame.progressBar:SetWidth(math.max(1, width))
-    self.frame.progressText:SetText(string.format("%.0f%%", progress))
+    
+    -- Show "100% (+x%)" if over 100%
+    local textString
+    if progress > 100 then
+        local overage = progress - 100
+        textString = string.format("100%% (+%.2f%%)", overage)
+    else
+        textString = string.format("%.2f%%", progress)
+    end
+    self.frame.progressText:SetText(textString)
+    
+    -- Color bar based on completion
+    if progress >= 100 then
+        self.frame.progressBar:SetTexture(0, 1, 0, 0.8)  -- Green
+    else
+        self.frame.progressBar:SetTexture(0.3, 0.8, 0.9, 0.8)  -- Cyan
+    end
 end
 
 function TurtleDungeonTimer:updateDeathCount()
@@ -907,7 +935,14 @@ function TurtleDungeonTimer:populateHistoryDropdown()
 
         local timeStr = self:formatTime(entry.time)
         local statusStr = entry.completed == false and " [X]" or ""
-        local text = string.format("%s - %s (%dd)%s", entry.dungeon or "?", timeStr, entry.deathCount or 0, statusStr)
+        
+        -- Add trash progress if available (already normalized)
+        local trashStr = ""
+        if entry.trashProgress and entry.trashProgress > 0 then
+            trashStr = string.format(" [T: %.2f%%]", entry.trashProgress)
+        end
+        
+        local text = string.format("%s - %s (%dd)%s%s", entry.dungeon or "?", timeStr, entry.deathCount or 0, trashStr, statusStr)
         if entry.date then
             text = entry.date .. " " .. text
         end
@@ -986,7 +1021,14 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
     local infoText = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     infoText:SetPoint("TOP", title, "BOTTOM", 0, -10)
     local timeStr = self:formatTime(entry.time or 0)
-    infoText:SetText(string.format("Time: %s | %d", timeStr, entry.deathCount or 0))
+    local infoStr = string.format("Time: %s | %d", timeStr, entry.deathCount or 0)
+    
+    -- Add trash progress if available (already normalized)
+    if entry.trashProgress and entry.trashProgress > 0 then
+        infoStr = infoStr .. string.format(" | Trash: %.2f%%", entry.trashProgress)
+    end
+    
+    infoText:SetText(infoStr)
 
     -- Boss kills list
     if entry.killTimes and table.getn(entry.killTimes) > 0 then
@@ -1031,11 +1073,7 @@ function TurtleDungeonTimer:resetUI()
 
     self:updateUI()
 
-    -- Collapse boss list on reset
-    if self.bossListExpanded then
-        self:collapseBossList()
-        self.bossListExpanded = false
-    end
+    -- Don't collapse boss list on reset - keep it as user left it
 end
 
 function TurtleDungeonTimer:updateFrameSize()
