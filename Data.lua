@@ -30,7 +30,7 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             {name = "Wicked Skitterer", hp = 13851, count = 13}                -- 180063
         },
         totalTrashHP = 1521201,  -- Total: 118035 + 235182 + 210239 + 160485 + 184470 + 39796 + 192576 + 200355 + 180063
-        trashRequiredPercent = 50  -- 80% required for completion
+        trashRequiredPercent = 65  -- 80% required for completion
     },
     ["Stratholme"] = {
         isDungeon = true,
