@@ -10,7 +10,7 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- ============================================================================
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
 -- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "1.0.7-alpha"
+TurtleDungeonTimer.ADDON_VERSION = "1.0.8-alpha"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil

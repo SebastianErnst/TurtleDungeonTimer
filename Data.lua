@@ -3,14 +3,14 @@
 -- ============================================================================
 
 TurtleDungeonTimer.DUNGEON_DATA = {
-    ["Black Morass"] = {
-        isDungeon = true,
-        variants = {
-            ["Default"] = {
-                bosses = {"Chronar", "Epidamu", "Drifting Avatar of Sand", "Time-Lord Epochronos", "Mossheart", "Antnormi", "Rotmaw"}
-            }
-        }
-    },
+    -- ["Black Morass"] = {
+    --     isDungeon = true,
+    --     variants = {
+    --         ["Default"] = {
+    --             bosses = {"Chronar", "Epidamu", "Drifting Avatar of Sand", "Time-Lord Epochronos", "Mossheart", "Antnormi", "Rotmaw"}
+    --         }
+    --     }
+    -- },
     ["Stormwind Vault"] = {
         isDungeon = true,
         variants = {
@@ -32,23 +32,23 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             }
         }
     },
-    ["Stratholme"] = {
-        isDungeon = true,
-        variants = {
-            -- ["Living"] = {
-            --     bosses = {"Timmy the Cruel", "Malor the Zealous", "Cannon Master Willey", "Archivist Galford", "Balnazzar"},
-            --     optionalBosses = {
-            --         ["Hearthsinger Forresten"] = true -- Rare
-            --     }
-            -- },
-            ["Undead"] = {
-                bosses = {"Baroness Anastari", "Nerub'enkan", "Maleki the Pallid", "Magistrate Barthilas", "Ramstein the Gorger", "Baron Rivendare"},
-                optionalBosses = {                    
-                    ["Stonespine"] = true -- Rare
-                }
-            }
-        }
-    },
+    -- ["Stratholme"] = {
+    --     isDungeon = true,
+    --     variants = {
+    --         -- ["Living"] = {
+    --         --     bosses = {"Timmy the Cruel", "Malor the Zealous", "Cannon Master Willey", "Archivist Galford", "Balnazzar"},
+    --         --     optionalBosses = {
+    --         --         ["Hearthsinger Forresten"] = true -- Rare
+    --         --     }
+    --         -- },
+    --         ["Undead"] = {
+    --             bosses = {"Baroness Anastari", "Nerub'enkan", "Maleki the Pallid", "Magistrate Barthilas", "Ramstein the Gorger", "Baron Rivendare"},
+    --             optionalBosses = {                    
+    --                 ["Stonespine"] = true -- Rare
+    --             }
+    --         }
+    --     }
+    -- },
     ["Dire Maul"] = {
         isDungeon = true,
         variants = {
@@ -116,38 +116,38 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             -- }
         }
     },
-    ["Upper Blackrock Spire"] = {
-        isDungeon = true,
-        variants = {
-            ["Default"] = {
-                bosses = {"Pyroguard Emberseer", "Solakar Flamewreath", "Warchief Rend Blackhand", "The Beast", "General Drakkisath"},
-                optionalBosses = {
-                    ["Jed Runewatcher"] = true, -- Rare
-                    ["Goraluk Anvilcrack"] = true -- Rare
-                }
-            }
-        }
-    },
-    ["Zul'Gurub"] = {
-        isDungeon = false, -- 20-man raid
-        variants = {
-            ["Default"] = {
-                bosses = {
-                    "High Priestess Jeklik",
-                    "High Priest Venoxis",
-                    "High Priestess Mar'li",
-                    "Bloodlord Mandokir",
-                    "High Priest Thekal",
-                    "High Priestess Arlokk",
-                    "Jin'do the Hexxer",
-                    "Hakkar the Soulflayer"
-                },
-                optionalBosses = {
-                    ["Gahz'ranka"] = true -- Summoned hydra boss
-                }
-            }
-        }
-    },
+    -- ["Upper Blackrock Spire"] = {
+    --     isDungeon = true,
+    --     variants = {
+    --         ["Default"] = {
+    --             bosses = {"Pyroguard Emberseer", "Solakar Flamewreath", "Warchief Rend Blackhand", "The Beast", "General Drakkisath"},
+    --             optionalBosses = {
+    --                 ["Jed Runewatcher"] = true, -- Rare
+    --                 ["Goraluk Anvilcrack"] = true -- Rare
+    --             }
+    --         }
+    --     }
+    -- },
+    -- ["Zul'Gurub"] = {
+    --     isDungeon = false, -- 20-man raid
+    --     variants = {
+    --         ["Default"] = {
+    --             bosses = {
+    --                 "High Priestess Jeklik",
+    --                 "High Priest Venoxis",
+    --                 "High Priestess Mar'li",
+    --                 "Bloodlord Mandokir",
+    --                 "High Priest Thekal",
+    --                 "High Priestess Arlokk",
+    --                 "Jin'do the Hexxer",
+    --                 "Hakkar the Soulflayer"
+    --             },
+    --             optionalBosses = {
+    --                 ["Gahz'ranka"] = true -- Summoned hydra boss
+    --             }
+    --         }
+    --     }
+    -- },
     ["The Stockade"] = {
         isDungeon = true,
         variants = {
