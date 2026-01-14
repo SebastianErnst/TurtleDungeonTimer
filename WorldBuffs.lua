@@ -10,8 +10,7 @@ local WORLD_BUFFS = {
     ["Songflower Serenade"] = true,
     ["Fengus' Ferocity"] = true,
     ["Mol'dar's Moxie"] = true,
-    ["Slip'kik's Savvy"] = true,
-    ["Righteous Fury"] = true  -- TEST: Remove after testing
+    ["Slip'kik's Savvy"] = true
 }
 
 -- Create hidden tooltip for buff scanning
