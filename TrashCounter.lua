@@ -22,8 +22,8 @@ local UI_UPDATE_INTERVAL = 0.1  -- Update UI max once per 0.1 seconds
 
 -- Build weighted average lookup table for a dungeon
 -- Formula: For mobs with same name: sum(hp × count) / sum(count)
-local function buildTrashLookup(dungeonData)
-    if not dungeonData.trashMobs then
+local function buildTrashLookup(variantData)
+    if not variantData.trashMobs then
         return nil
     end
     
@@ -31,7 +31,7 @@ local function buildTrashLookup(dungeonData)
     local nameData = {}  -- Temporary: {name = {totalHP = x, totalCount = y}}
     
     -- First pass: Aggregate HP and counts by name
-    for i, mob in ipairs(dungeonData.trashMobs) do
+    for i, mob in ipairs(variantData.trashMobs) do
         local name = mob.name
         if not nameData[name] then
             nameData[name] = {totalHP = 0, totalCount = 0}
@@ -104,60 +104,80 @@ function TDTTrashCounter:initialize()
         TurtleDungeonTimerDB.trashProgress = {}
     end
     
-    -- Build lookup tables for all dungeons with trash data
+    -- Build lookup tables for all dungeon variants with trash data
     for dungeonName, dungeonData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
-        if dungeonData.trashMobs then
-            dungeonData.trashLookup = buildTrashLookup(dungeonData)
-            
-            -- Debug output
-            if TurtleDungeonTimerDB.debug then
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Built lookup for " .. dungeonName .. ":")
-                for name, avgHP in pairs(dungeonData.trashLookup) do
-                    DEFAULT_CHAT_FRAME:AddMessage("  " .. name .. " = " .. avgHP .. " HP (weighted avg)")
+        if dungeonData.variants then
+            for variantName, variantData in pairs(dungeonData.variants) do
+                if variantData.trashMobs then
+                    variantData.trashLookup = buildTrashLookup(variantData)
+                    
+                    -- Debug output
+                    if TurtleDungeonTimerDB.debug then
+                        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Built lookup for " .. dungeonName .. " - " .. variantName .. ":")
+                        for name, avgHP in pairs(variantData.trashLookup) do
+                            DEFAULT_CHAT_FRAME:AddMessage("  " .. name .. " = " .. avgHP .. " HP (weighted avg)")
+                        end
+                    end
                 end
             end
         end
     end
 end
 
-function TDTTrashCounter:prepareDungeon(dungeonName)
+function TDTTrashCounter:prepareDungeon(dungeonName, variantName)
     -- Called when dungeon is selected (but not started yet)
     -- Shows the trash bar at 0% if dungeon has trash data
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[dungeonName]
     
-    if not dungeonData or not dungeonData.trashMobs then
-        -- No trash data, hide the bar
+    if not dungeonData or not dungeonData.variants then
         self:hideTrashBar()
         return
     end
     
-    currentDungeon = dungeonData
+    local variantData = dungeonData.variants[variantName]
+    if not variantData or not variantData.trashMobs then
+        -- No trash data for this variant, hide the bar
+        self:hideTrashBar()
+        return
+    end
+    
+    currentDungeon = variantData
     killedTrashHP = 0
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r prepareDungeon: killedTrashHP auf 0 gesetzt", 1, 1, 0)
+    end
     
     -- Show bar at 0%
     self:updateUI()
 end
 
-function TDTTrashCounter:startDungeon(dungeonName)
+function TDTTrashCounter:startDungeon(dungeonName, variantName)
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[dungeonName]
     
-    if not dungeonData or not dungeonData.trashMobs then
-        return  -- No trash data for this dungeon
+    if not dungeonData or not dungeonData.variants then
+        return  -- No dungeon data
     end
     
-    currentDungeon = dungeonData
+    local variantData = dungeonData.variants[variantName]
+    if not variantData or not variantData.trashMobs then
+        return  -- No trash data for this variant
+    end
+    
+    currentDungeon = variantData
     killedTrashHP = 0
     
-    -- Initialize saved progress
-    if not TurtleDungeonTimerDB.trashProgress[dungeonName] then
-        TurtleDungeonTimerDB.trashProgress[dungeonName] = {
+    -- Initialize saved progress (use dungeon+variant key)
+    local progressKey = dungeonName .. "_" .. variantName
+    if not TurtleDungeonTimerDB.trashProgress[progressKey] then
+        TurtleDungeonTimerDB.trashProgress[progressKey] = {
             killedHP = 0,
             lastUpdate = time()
         }
     end
     
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Started tracking for " .. dungeonName)
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Started tracking for " .. dungeonName .. " (" .. variantName .. ")")
         DEFAULT_CHAT_FRAME:AddMessage("  Total trash HP: " .. formatHP(currentDungeon.totalTrashHP))
         DEFAULT_CHAT_FRAME:AddMessage("  Required: " .. (currentDungeon.trashRequiredPercent or 100) .. "%")
     end
@@ -187,7 +207,22 @@ function TDTTrashCounter:resetProgress(dungeonName)
 end
 
 function TDTTrashCounter:addTrashHP(hp)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF00FF00[TDT Trash Debug]|r addTrashHP: %d + %d = %d", killedTrashHP, hp, killedTrashHP + hp), 1, 1, 0)
+    end
+    
     killedTrashHP = killedTrashHP + hp
+    self:updateUI()
+    self:checkRunCompletion()
+end
+
+function TDTTrashCounter:setTrashHP(hp)
+    -- Set absolute HP value instead of adding
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF00FF00[TDT Trash Debug]|r setTrashHP: %d → %d", killedTrashHP, hp), 1, 1, 0)
+    end
+    
+    killedTrashHP = hp
     self:updateUI()
     self:checkRunCompletion()
 end

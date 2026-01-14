@@ -830,10 +830,6 @@ function TurtleDungeonTimer:exportHistoryEntry(entry)
     -- Use unified export function
     local exportString = self:exportRunData(entry)
     
-    -- Show export in chat
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Export String:")
-    DEFAULT_CHAT_FRAME:AddMessage(exportString)
-    
     -- Show in export dialog
     if self.exportDialog then
         if self.exportDialog.editBox then

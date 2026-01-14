@@ -193,23 +193,28 @@ function TurtleDungeonTimer:createDebugFrame()
     -- === TRASH DEBUG ===
     createButton("Add 1% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
-        if not timer.selectedDungeon then
+        if not timer.selectedDungeon or not timer.selectedVariant then
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
             return
         end
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
-        if not dungeonData or not dungeonData.trashMobs then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Trash-Daten!")
+        if not dungeonData or not dungeonData.variants then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Daten!")
+            return
+        end
+        local variantData = dungeonData.variants[timer.selectedVariant]
+        if not variantData or not variantData.trashMobs then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Variante hat keine Trash-Daten!")
             return
         end
         
         -- Ensure trash counter is started
         if not timer.isRunning then
-            TDTTrashCounter:prepareDungeon(timer.selectedDungeon)
+            TDTTrashCounter:prepareDungeon(timer.selectedDungeon, timer.selectedVariant)
         end
         
-        local requiredPercent = dungeonData.trashRequiredPercent or 100
-        local addHP = (dungeonData.totalTrashHP * requiredPercent / 100) * 0.01
+        local requiredPercent = variantData.trashRequiredPercent or 100
+        local addHP = (variantData.totalTrashHP * requiredPercent / 100) * 0.01
         TDTTrashCounter:addTrashHP(addHP)
         local progress = TDTTrashCounter:getProgress()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +1% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
@@ -217,23 +222,28 @@ function TurtleDungeonTimer:createDebugFrame()
     
     createButton("Add 5% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
-        if not timer.selectedDungeon then
+        if not timer.selectedDungeon or not timer.selectedVariant then
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
             return
         end
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
-        if not dungeonData or not dungeonData.trashMobs then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Trash-Daten!")
+        if not dungeonData or not dungeonData.variants then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Daten!")
+            return
+        end
+        local variantData = dungeonData.variants[timer.selectedVariant]
+        if not variantData or not variantData.trashMobs then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Variante hat keine Trash-Daten!")
             return
         end
         
         -- Ensure trash counter is started
         if not timer.isRunning then
-            TDTTrashCounter:prepareDungeon(timer.selectedDungeon)
+            TDTTrashCounter:prepareDungeon(timer.selectedDungeon, timer.selectedVariant)
         end
         
-        local requiredPercent = dungeonData.trashRequiredPercent or 100
-        local addHP = (dungeonData.totalTrashHP * requiredPercent / 100) * 0.05
+        local requiredPercent = variantData.trashRequiredPercent or 100
+        local addHP = (variantData.totalTrashHP * requiredPercent / 100) * 0.05
         TDTTrashCounter:addTrashHP(addHP)
         local progress = TDTTrashCounter:getProgress()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +5% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
@@ -241,23 +251,28 @@ function TurtleDungeonTimer:createDebugFrame()
     
     createButton("Add 100% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
-        if not timer.selectedDungeon then
+        if not timer.selectedDungeon or not timer.selectedVariant then
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
             return
         end
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
-        if not dungeonData or not dungeonData.trashMobs then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Trash-Daten!")
+        if not dungeonData or not dungeonData.variants then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon hat keine Daten!")
+            return
+        end
+        local variantData = dungeonData.variants[timer.selectedVariant]
+        if not variantData or not variantData.trashMobs then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Variante hat keine Trash-Daten!")
             return
         end
         
         -- Ensure trash counter is started
         if not timer.isRunning then
-            TDTTrashCounter:prepareDungeon(timer.selectedDungeon)
+            TDTTrashCounter:prepareDungeon(timer.selectedDungeon, timer.selectedVariant)
         end
         
-        local requiredPercent = dungeonData.trashRequiredPercent or 100
-        local addHP = (dungeonData.totalTrashHP * requiredPercent / 100) * 1.0
+        local requiredPercent = variantData.trashRequiredPercent or 100
+        local addHP = (variantData.totalTrashHP * requiredPercent / 100) * 1.0
         TDTTrashCounter:addTrashHP(addHP)
         local progress = TDTTrashCounter:getProgress()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +100% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
@@ -402,13 +417,16 @@ function TurtleDungeonTimer:createDebugFrame()
         
         -- Set trash to 100%
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
-        if dungeonData and dungeonData.trashMobs then
-            local requiredPercent = dungeonData.trashRequiredPercent or 100
-            local targetHP = (dungeonData.totalTrashHP * requiredPercent / 100)
-            -- Reset first, then add
-            TDTTrashCounter:resetProgress(timer.selectedDungeon)
-            TDTTrashCounter:addTrashHP(targetHP)
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Trash auf 100% gesetzt")
+        if dungeonData and timer.selectedVariant then
+            local variantData = dungeonData.variants[timer.selectedVariant]
+            if variantData and variantData.trashMobs then
+                local requiredPercent = variantData.trashRequiredPercent or 100
+                local targetHP = (variantData.totalTrashHP * requiredPercent / 100)
+                -- Reset first, then add
+                TDTTrashCounter:resetProgress(timer.selectedDungeon)
+                TDTTrashCounter:addTrashHP(targetHP)
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Trash auf 100% gesetzt")
+            end
         end
         
         -- Kill all bosses

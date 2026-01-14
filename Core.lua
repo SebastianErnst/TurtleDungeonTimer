@@ -29,6 +29,7 @@ function TurtleDungeonTimer:new()
     self.isRunning = false
     self.isCountingDown = false
     self.countdownTime = 0
+    self.restoredElapsedTime = nil -- For restoring paused timer after reload
     
     -- UI references
     self.frame = nil
@@ -187,6 +188,24 @@ function TurtleDungeonTimer:initialize()
         end
     end
     
+    -- Handle interrupted countdown (wait for sync, then decide)
+    if self.wasInCountdown then
+        self:scheduleTimer(function()
+            local timer = TurtleDungeonTimer:getInstance()
+            -- Check if sync already updated our state
+            if not timer.isRunning and not timer.syncReceivedCountdownData then
+                -- No sync data received (solo or group offline)
+                -- Start timer now
+                if not timer.isRunning then
+                    timer:start()
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Countdown abgelaufen - Timer gestartet", 1, 1, 0)
+                end
+            end
+            timer.wasInCountdown = false
+            timer.syncReceivedCountdownData = false
+        end, 4.0, false)  -- Wait 4 seconds for sync data
+    end
+    
     -- Restore visibility state
     if TurtleDungeonTimerDB.visible then
         self:show()
@@ -237,6 +256,15 @@ function TurtleDungeonTimer:saveLastRun()
         trashProgress, trashKilledHP = TDTTrashCounter:getProgress()
     end
     
+    -- Calculate elapsed time if timer is running
+    local elapsedTime = 0
+    if self.isRunning and self.startTime then
+        elapsedTime = GetTime() - self.startTime
+    elseif TurtleDungeonTimerDB.lastRun and TurtleDungeonTimerDB.lastRun.elapsedTime then
+        -- If timer is paused, keep the last elapsed time
+        elapsedTime = TurtleDungeonTimerDB.lastRun.elapsedTime
+    end
+    
     TurtleDungeonTimerDB.lastRun = {
         dungeon = self.selectedDungeon,
         variant = self.selectedVariant,
@@ -244,7 +272,18 @@ function TurtleDungeonTimer:saveLastRun()
         killTimes = self.killTimes,
         deathCount = self.deathCount,
         startTime = self.startTime,
+        isRunning = self.isRunning,
+        isCountingDown = self.isCountingDown,
+        countdownTime = self.countdownTime,
+        elapsedTime = elapsedTime,
+        saveTimestamp = time(), -- Unix timestamp for restore calculation
         playerName = self.playerName,
+        runId = self.currentRunId,  -- Save Run-ID for session tracking
+        -- Save preparation state
+        preparationState = self.preparationState,
+        countdownTriggered = self.countdownTriggered,
+        countdownValue = self.countdownValue,
+        firstZoneEnter = self.firstZoneEnter,
         guildName = self.guildName,
         groupClasses = self.groupClasses,
         hasWorldBuffs = self.hasWorldBuffs or false,
@@ -261,9 +300,12 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
     local trashProgress = 0
     local trashRequired = 100
     local dungeonData = self.DUNGEON_DATA[self.selectedDungeon]
-    if dungeonData and dungeonData.trashMobs then
-        trashProgress = TDTTrashCounter:getProgress()
-        trashRequired = dungeonData.trashRequiredPercent or 100
+    if dungeonData and self.selectedVariant then
+        local variantData = dungeonData.variants[self.selectedVariant]
+        if variantData and variantData.trashMobs then
+            trashProgress = TDTTrashCounter:getProgress()
+            trashRequired = variantData.trashRequiredPercent or 100
+        end
     end
     
     local historyEntry = {
@@ -302,16 +344,79 @@ function TurtleDungeonTimer:restoreLastRun()
     if self.selectedDungeon == lastRun.dungeon and self.selectedVariant == lastRun.variant then
         self.killTimes = lastRun.killTimes or {}
         self.deathCount = lastRun.deathCount or 0
+        
+        -- Restore Run-ID
+        if lastRun.runId then
+            self.currentRunId = lastRun.runId
+            if TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("[Debug Core] Run-ID restored: " .. self.currentRunId, 1, 1, 0)
+            end
+        end
+        
+        -- Restore preparation state if available
+        if lastRun.preparationState then
+            self.preparationState = lastRun.preparationState
+            self.countdownTriggered = lastRun.countdownTriggered or false
+            self.countdownValue = lastRun.countdownValue or 0
+            self.firstZoneEnter = lastRun.firstZoneEnter
+        end
         self.playerName = lastRun.playerName
         self.guildName = lastRun.guildName
         self.groupClasses = lastRun.groupClasses
         self.hasWorldBuffs = lastRun.hasWorldBuffs or false
         self.worldBuffPlayers = lastRun.worldBuffPlayers or {}
         
-        -- Restore trash counter if available
+        -- Restore countdown state if it was active
+        if lastRun.isCountingDown then
+            -- Countdown was active when logged out
+            -- Don't auto-start immediately - wait for sync data from group
+            -- If in group: sync will provide current state
+            -- If solo: auto-start after sync timeout
+            self.wasInCountdown = true
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Countdown wurde unterbrochen - warte auf Gruppendaten...", 1, 1, 0)
+        -- Restore timer state and calculate correct startTime
+        elseif lastRun.isRunning then
+            self.isRunning = true
+            local elapsedAtSave = lastRun.elapsedTime or 0
+            local timeSinceSave = 0
+            
+            if lastRun.saveTimestamp then
+                timeSinceSave = time() - lastRun.saveTimestamp
+            end
+            
+            -- Adjust startTime to account for elapsed time and offline time
+            self.startTime = GetTime() - elapsedAtSave - timeSinceSave
+            
+            -- Notify user about continuation
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer nach Reload fortgesetzt (Offline Zeit: " .. self:formatTime(timeSinceSave) .. ")", 1, 1, 0)
+        else
+            -- Timer was paused, restore elapsed time for correct display
+            self.isRunning = false
+            self.restoredElapsedTime = lastRun.elapsedTime or 0
+        end
+        
+        -- Restore trash counter
+        -- CRITICAL: Always call prepareDungeon to initialize currentDungeon + trashLookup!
+        -- Without this, onMobKilled() won't work (needs currentDungeon.trashLookup)
+        local inGroup = (GetNumRaidMembers() > 0 or GetNumPartyMembers() > 0)
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Core] restoreLastRun: inGroup=" .. tostring(inGroup) .. ", trashHP=" .. tostring(lastRun.trashKilledHP or 0), 1, 1, 0)
+        end
+        
+        -- Always prepare dungeon (initializes lookup tables)
+        TDTTrashCounter:prepareDungeon(lastRun.dungeon, lastRun.variant)
+        
+        -- Restore HP if available
         if lastRun.trashKilledHP and lastRun.trashKilledHP > 0 then
-            TDTTrashCounter:prepareDungeon(lastRun.dungeon)
-            TDTTrashCounter:addTrashHP(lastRun.trashKilledHP)
+            TDTTrashCounter:setTrashHP(lastRun.trashKilledHP)
+        end
+        
+        -- If in group, request sync data to get updated values from others
+        if inGroup then
+            if TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("[Debug Core] In group after reload - requesting current run data", 1, 1, 0)
+            end
+            self:requestCurrentRunData()
         end
         
         -- Update UI with saved data

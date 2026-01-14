@@ -138,6 +138,11 @@ function TurtleDungeonTimer:selectDungeon(dungeonName)
 
     -- Broadcast dungeon selection
     self:broadcastDungeonSelected(dungeonName)
+    
+    -- Generate and broadcast Run-ID (if group leader or first in group)
+    if GetNumRaidMembers() > 0 or GetNumPartyMembers() > 0 then
+        self:broadcastRunId()
+    end
 
     TurtleDungeonTimerDB.lastSelection.dungeon = dungeonName
 
@@ -209,7 +214,7 @@ function TurtleDungeonTimer:selectVariant(variantName)
     TurtleDungeonTimerDB.lastSelection.variant = variantName
 
     -- Prepare trash counter bar
-    TDTTrashCounter:prepareDungeon(self.selectedDungeon)
+    TDTTrashCounter:prepareDungeon(self.selectedDungeon, self.selectedVariant)
 
     -- Rebuild boss list
     self:rebuildBossRows()
@@ -285,14 +290,7 @@ function TurtleDungeonTimer:createHeader()
     dungeonName:SetWidth(145)
     self.frame.dungeonNameText = dungeonName
 
-    -- Make dungeon name clickable to open selector (limited width to not overlap buttons)
-    local dungeonNameButton = CreateFrame("Button", nil, self.frame)
-    dungeonNameButton:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 15, -15)
-    dungeonNameButton:SetWidth(145)
-    dungeonNameButton:SetHeight(20)
-    dungeonNameButton:SetScript("OnClick", function()
-        TurtleDungeonTimer:getInstance():showDungeonMenu(this)
-    end)
+    -- Dungeon name is now just text, no longer clickable
 
     -- Start/Reset Button (red button with text)
     local startBtn = CreateFrame("Button", nil, self.frame)
@@ -322,9 +320,9 @@ function TurtleDungeonTimer:createHeader()
     startBtn:SetScript("OnClick", function()
         local timer = TurtleDungeonTimer:getInstance()
 
-        -- If running, toggle pause
+        -- If running, pause the timer
         if timer.isRunning then
-            timer:toggleStartPause()
+            timer:pause()
             return
         end
 
@@ -1054,7 +1052,244 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
         end
     end
 
+    -- Report Button (with dropdown)
+    local reportBtn = CreateFrame("Button", nil, detailFrame, "GameMenuButtonTemplate")
+    reportBtn:SetWidth(100)
+    reportBtn:SetHeight(25)
+    reportBtn:SetPoint("BOTTOMLEFT", detailFrame, "BOTTOMLEFT", 20, 15)
+    reportBtn:SetText("REPORT")
+    
+    -- Create report dropdown
+    local reportDropdown = CreateFrame("Frame", nil, detailFrame)
+    reportDropdown:SetWidth(100)
+    reportDropdown:SetHeight(90)
+    reportDropdown:SetPoint("BOTTOM", reportBtn, "TOP", 0, 5)
+    reportDropdown:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
+        insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+    reportDropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    reportDropdown:SetFrameStrata("TOOLTIP")
+    reportDropdown:Hide()
+    
+    -- Create dropdown options
+    local channels = {{"SAY", "Say"}, {"PARTY", "Party"}, {"RAID", "Raid"}, {"GUILD", "Guild"}}
+    for i, channelData in ipairs(channels) do
+        local chatType = channelData[1]
+        local chatLabel = channelData[2]
+        
+        local btn = CreateFrame("Button", nil, reportDropdown)
+        btn:SetWidth(92)
+        btn:SetHeight(18)
+        btn:SetPoint("TOP", reportDropdown, "TOP", 0, -4 - (i-1) * 20)
+        
+        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        text:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        text:SetText(chatLabel)
+        
+        btn:SetScript("OnEnter", function()
+            this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+            this:SetBackdropCexportHistoryEntryolor(0.3, 0.3, 0.3, 0.8)
+        end)
+        btn:SetScript("OnLeave", function()
+            this:SetBackdrop(nil)
+        end)
+        
+        -- Capture entry in local variable for closure
+        local historyEntry = entry
+        btn:SetScript("OnClick", function()
+            TurtleDungeonTimer:sendHistoryReport(historyEntry, chatType)
+            reportDropdown:Hide()
+        end)
+    end
+    
+    reportBtn:SetScript("OnClick", function()
+        if reportDropdown:IsVisible() then
+            reportDropdown:Hide()
+        else
+            reportDropdown:Show()
+        end
+    end)
+    
+    -- Export Button
+    local exportBtn = CreateFrame("Button", nil, detailFrame, "GameMenuButtonTemplate")
+    exportBtn:SetWidth(100)
+    exportBtn:SetHeight(25)
+    exportBtn:SetPoint("LEFT", reportBtn, "RIGHT", 10, 0)
+    exportBtn:SetText("EXPORT")
+    
+    -- Capture entry in local variable for closure
+    local historyEntry = entry
+    exportBtn:SetScript("OnClick", function()
+        TurtleDungeonTimer:showHistoryExportDialog(historyEntry)
+    end)
+
     detailFrame:Show()
+end
+
+-- ============================================================================
+-- HISTORY REPORT & EXPORT FUNCTIONS
+-- ============================================================================
+function TurtleDungeonTimer:sendHistoryReport(entry, chatType)
+    if not entry then return end
+    
+    chatType = chatType or "SAY"
+    
+    local dungeonStr = entry.dungeon or "Unknown"
+    if entry.variant and entry.variant ~= "Default" then
+        dungeonStr = dungeonStr .. " (" .. entry.variant .. ")"
+    end
+    
+    -- Remove leading ! to prevent command parsing
+    if string.sub(dungeonStr, 1, 1) == "!" then
+        dungeonStr = string.sub(dungeonStr, 2)
+    end
+    
+    local mainMessage = dungeonStr .. " completed in " .. self:formatTime(entry.time) .. ". Deaths: " .. entry.deathCount
+    SendChatMessage(mainMessage, chatType)
+    
+    -- Combine bosses into readable messages (max ~255 chars per message)
+    if entry.killTimes and table.getn(entry.killTimes) > 0 then
+        local bossLine = "Bosses: "
+        local lineCount = 0
+        
+        for i = 1, table.getn(entry.killTimes) do
+            local bossEntry = entry.killTimes[i].bossName .. " (" .. self:formatTime(entry.killTimes[i].time) .. ")"
+            
+            -- Check if adding this boss would make the line too long
+            if string.len(bossLine .. bossEntry) > 240 then
+                SendChatMessage(bossLine, chatType)
+                bossLine = bossEntry
+                lineCount = lineCount + 1
+            else
+                if i > 1 and bossLine ~= "Bosses: " then
+                    bossLine = bossLine .. ", "
+                end
+                bossLine = bossLine .. bossEntry
+            end
+        end
+        
+        -- Send remaining bosses
+        if bossLine ~= "Bosses: " then
+            SendChatMessage(bossLine, chatType)
+        end
+    end
+end
+
+function TurtleDungeonTimer:showHistoryExportDialog(entry)
+    if not entry then return end
+    
+    -- Use unified export function from Export.lua
+    local exportString = self:exportRunData(entry)
+    
+    if not exportString then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r No data to export.", 1, 0.5, 0)
+        return
+    end
+    
+    -- Create or show existing dialog
+    if self.historyExportDialog then
+        if self.historyExportDialog.editBox then
+            self.historyExportDialog.editBox:SetText(exportString)
+            self.historyExportDialog.editBox:HighlightText()
+        end
+        self.historyExportDialog:Show()
+        return
+    end
+    
+    -- Create export dialog
+    local dialog = CreateFrame("Frame", nil, UIParent)
+    dialog:SetWidth(400)
+    dialog:SetHeight(150)
+    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+    dialog:EnableMouse(true)
+    self.historyExportDialog = dialog
+    
+    -- Title
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", dialog, "TOP", 0, -15)
+    title:SetText("Export Run Data")
+    title:SetTextColor(1, 0.82, 0)
+    
+    local desc = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    desc:SetPoint("TOP", title, "BOTTOM", 0, -10)
+    desc:SetText("Copy the text to import it on the website.")
+    desc:SetTextColor(0, 1, 0)
+    
+    -- ScrollFrame for export string
+    local scrollFrame = CreateFrame("ScrollFrame", nil, dialog)
+    scrollFrame:SetWidth(360)
+    scrollFrame:SetHeight(50)
+    scrollFrame:SetPoint("TOP", desc, "BOTTOM", 0, -10)
+    
+    -- Edit box for export string
+    local editBox = CreateFrame("EditBox", nil, scrollFrame)
+    editBox:SetWidth(350)
+    editBox:SetHeight(50)
+    editBox:SetMultiLine(true)
+    editBox:SetMaxLetters(0)
+    editBox:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
+        insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+    editBox:SetBackdropColor(0, 0, 0, 0.8)
+    editBox:SetFont("Fonts\\FRIZQT__.TTF", 10)
+    editBox:SetTextColor(1, 1, 1)
+    editBox:SetAutoFocus(false)
+    editBox:SetText(exportString)
+    editBox:HighlightText()
+    editBox:SetScript("OnEscapePressed", function()
+        dialog:Hide()
+    end)
+    editBox:SetScript("OnEditFocusGained", function()
+        this:HighlightText()
+    end)
+    editBox:SetScript("OnTextChanged", function()
+        scrollFrame:UpdateScrollChildRect()
+    end)
+    
+    scrollFrame:SetScrollChild(editBox)
+    scrollFrame:EnableMouseWheel()
+    scrollFrame:SetScript("OnMouseWheel", function()
+        local current = scrollFrame:GetVerticalScroll()
+        local maxScroll = scrollFrame:GetVerticalScrollRange()
+        if arg1 > 0 then
+            scrollFrame:SetVerticalScroll(math.max(0, current - 20))
+        else
+            scrollFrame:SetVerticalScroll(math.min(maxScroll, current + 20))
+        end
+    end)
+    
+    dialog.editBox = editBox
+    
+    -- Close Button
+    local closeButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    closeButton:SetWidth(100)
+    closeButton:SetHeight(25)
+    closeButton:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 15)
+    closeButton:SetText("Close")
+    closeButton:SetScript("OnClick", function()
+        dialog:Hide()
+    end)
+    
+    dialog:Show()
 end
 
 -- ============================================================================

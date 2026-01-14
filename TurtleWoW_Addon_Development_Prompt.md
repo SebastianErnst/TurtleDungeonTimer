@@ -454,6 +454,22 @@ end
 -- Force save: not possible in 1.12 (no explicit SaveVariables call)
 ```
 
+### Version Management (TurtleDungeonTimer Specific)
+
+**⚠️ CRITICAL:** When updating the addon version, you MUST update it in TWO places:
+
+1. **TurtleDungeonTimer.toc** - The `## Version:` field
+2. **Preparation.lua** - The `ADDON_VERSION` constant used for version checks
+
+```lua
+-- In Preparation.lua
+local ADDON_VERSION = "1.2.3"  -- Must match .toc version!
+```
+
+**Why this matters:** The preparation system checks version compatibility between party members. If the .toc version changes but `ADDON_VERSION` in Preparation.lua doesn't, version checks will fail or show incorrect warnings.
+
+**When to update:** Every time you increment the version in the .toc file for a release.
+
 ---
 
 ## Events Reference
@@ -566,6 +582,53 @@ end
 - Any property set as `MyAddon.propertyName = value`
 
 **Rule of thumb:** If you see a variable used with a namespace prefix anywhere in the codebase, **NEVER** access it as a plain global variable!
+
+### Persistent Timer System (Important!)
+
+**⚠️ CRITICAL:** The TurtleDungeonTimer addon implements a sophisticated persistent timer system that continues running through reloads, logouts, and even crashes!
+
+```lua
+-- How it works:
+-- 1. Timer state saved every second while running (Core.lua:saveLastRun)
+-- 2. saveTimestamp tracks when the run was last saved
+-- 3. On reload: calculates elapsed time + offline time
+-- 4. Timer continues seamlessly with correct time display
+
+-- Key variables for persistent timing:
+self.isRunning           -- Timer currently active
+self.startTime           -- GetTime() when started (recalculated on restore)
+self.restoredElapsedTime -- Elapsed time before reload (for paused state)
+saveTimestamp            -- Unix time() when saved (for offline calculation)
+```
+
+**What happens on reload:**
+1. `restoreLastRun()` checks if same dungeon selected
+2. If `lastRun.isRunning = true`: Timer continues automatically
+3. New `startTime = GetTime() - elapsedAtSave - offlineTime`
+4. If `lastRun.isRunning = false`: Timer shows paused with correct elapsed time
+
+**When run state is saved:**
+- Every second during active timer (automatic)
+- Every boss kill event
+- Every death event  
+- When timer is paused
+- When dungeon/variant is changed
+
+**Common gotcha:** Always use `self.restoredElapsedTime` in `updateTimer()` for paused timers!
+
+```lua
+-- ❌ WRONG - Only shows time for running timers
+if self.isRunning and self.startTime then
+    elapsed = GetTime() - self.startTime
+end
+
+-- ✅ CORRECT - Shows time for both running and paused timers
+if self.isRunning and self.startTime then
+    elapsed = GetTime() - self.startTime
+elseif self.restoredElapsedTime then
+    elapsed = self.restoredElapsedTime
+end
+```
 
 ### Closures in Loops (CRITICAL!)
 

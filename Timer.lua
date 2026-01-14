@@ -30,12 +30,24 @@ function TurtleDungeonTimer:start()
     
     -- Start timer immediately
     self.isRunning = true
-    self.startTime = GetTime()
-    self.killTimes = {}
-    self.deathCount = 0
     
-    -- Generate UUID for this run
-    self.currentRunUUID = self:generateUUID()
+    -- Handle timer continuation vs fresh start
+    if self.restoredElapsedTime and self.restoredElapsedTime > 0 then
+        -- Continue from paused state
+        self.startTime = GetTime() - self.restoredElapsedTime
+        self.restoredElapsedTime = nil
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer fortgesetzt!", 1, 1, 0)
+    else
+        -- Fresh start
+        self.startTime = GetTime()
+        self.killTimes = {}
+        self.deathCount = 0
+        
+        -- Generate UUID for this run
+        self.currentRunUUID = self:generateUUID()
+        
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer gestartet!", 1, 1, 0)
+    end
     
     -- Collect player and group info
     self.playerName = UnitName("player") or "Unknown"
@@ -47,15 +59,18 @@ function TurtleDungeonTimer:start()
     
     -- Start trash counter if dungeon has trash data
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon]
-    if dungeonData and dungeonData.trashMobs then
-        TDTTrashCounter:startDungeon(self.selectedDungeon)
+    if dungeonData and self.selectedVariant then
+        local variantData = dungeonData.variants[self.selectedVariant]
+        if variantData and variantData.trashMobs then
+            TDTTrashCounter:startDungeon(self.selectedDungeon, self.selectedVariant)
+        end
     end
     
     -- Disable dungeon selector while running
     self:setDungeonSelectorEnabled(false)
     
-    -- Send chat message to user
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer gestartet!", 1, 1, 0)
+    -- Save initial state
+    self:saveLastRun()
     
     -- Reset UI
     self:resetUI()
@@ -126,18 +141,26 @@ function TurtleDungeonTimer:showResetConfirmation()
     dialog:Show()
 end
 
-function TurtleDungeonTimer:stop()
-    -- Stop/abort the current run without saving
+function TurtleDungeonTimer:pause()
+    -- Pause the timer while keeping the current state
+    if not self.isRunning then return end
+    
     self.isRunning = false
+    
+    -- Calculate elapsed time for restoration later
+    if self.startTime then
+        self.restoredElapsedTime = GetTime() - self.startTime
+    end
+    
     self.startTime = nil
     
-    -- Stop world buff scanning
-    self:stopWorldBuffScanning()
+    -- Save paused state
+    self:saveLastRun()
     
     -- Enable dungeon selector again
     self:setDungeonSelectorEnabled(true)
     
-    -- TODO: Add syncTimerStop if needed for group sync
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer pausiert!", 1, 1, 0)
     
     -- Update button text
     self:updateStartPauseButton()
@@ -233,10 +256,13 @@ function TurtleDungeonTimer:performResetDirect()
     self.killTimes = {}
     self.deathCount = 0
     self.startTime = nil
-    self.currentRunId = nil
+    self.restoredElapsedTime = nil
     self.hasWorldBuffs = false
     self.hasCheckedWorldBuffs = false
     self.worldBuffPlayers = {}
+    
+    -- Clear Run ID
+    self:clearRunId()
     
     -- Reset all boss defeated flags
     for i = 1, table.getn(self.bossList) do
@@ -283,10 +309,12 @@ function TurtleDungeonTimer:performResetSilent()
     self:stopWorldBuffScanning()
     self.deathCount = 0
     self.startTime = nil
-    self.currentRunId = nil  -- Clear run ID on reset
     self.hasWorldBuffs = false
     self.hasCheckedWorldBuffs = false
     self.worldBuffPlayers = {}
+    
+    -- Clear Run ID
+    self:clearRunId()
     
     -- Clear last run from database
     TurtleDungeonTimerDB.lastRun = {}
@@ -313,6 +341,10 @@ function TurtleDungeonTimer:updateStartPauseButton()
         self.frame.startPauseButton:Enable()
         if self.isRunning or self.isCountingDown then
             self.frame.startPauseButton:SetText("PAUSE")
+        elseif self.restoredElapsedTime and self.restoredElapsedTime > 0 then
+            self.frame.startPauseButton:SetText("CONTINUE")
+        elseif table.getn(self.killTimes) > 0 or self.deathCount > 0 then
+            self.frame.startPauseButton:SetText("CONTINUE")
         else
             self.frame.startPauseButton:SetText("START")
         end
@@ -419,36 +451,50 @@ function TurtleDungeonTimer:setupUpdateLoop()
     
     self.updateFrame = CreateFrame("Frame")
     self.updateFrame.lastUpdate = 0
+    self.updateFrame.lastSave = 0
     self.updateFrame:SetScript("OnUpdate", function()
-        -- Throttle updates to once per 0.1 seconds (10 times/sec instead of 60+)
+        local timer = TurtleDungeonTimer:getInstance()
         local now = GetTime()
-        if now - this.lastUpdate < 0.1 then
-            return
+        
+        -- Throttle UI updates to once per 0.1 seconds (10 times/sec instead of 60+)
+        if now - this.lastUpdate >= 0.1 then
+            this.lastUpdate = now
+            timer:updateTimer()
         end
-        this.lastUpdate = now
-        TurtleDungeonTimer:getInstance():updateTimer()
+        
+        -- Save run state every second when timer is running
+        if timer.isRunning and now - this.lastSave >= 1.0 then
+            this.lastSave = now
+            timer:saveLastRun()
+        end
     end)
 end
 
 function TurtleDungeonTimer:updateTimer()
     if not self.frame then return end
     
+    local elapsed = 0
+    
     if self.isRunning and self.startTime then
-        local elapsed = GetTime() - self.startTime
-        if self.frame.timeText then
-            self.frame.timeText:SetText(self:formatTime(elapsed))
-            
-            -- Compare with best time
-            local bestTime = self:getBestTime()
-            if bestTime then
-                if elapsed < bestTime.time then
-                    self.frame.timeText:SetTextColor(0, 1, 0) -- Green = ahead
-                else
-                    self.frame.timeText:SetTextColor(1, 0.5, 0.5) -- Red = behind
-                end
+        elapsed = GetTime() - self.startTime
+    elseif self.restoredElapsedTime then
+        -- Timer is paused but we have restored time from save
+        elapsed = self.restoredElapsedTime
+    end
+    
+    if elapsed > 0 and self.frame.timeText then
+        self.frame.timeText:SetText(self:formatTime(elapsed))
+        
+        -- Compare with best time
+        local bestTime = self:getBestTime()
+        if bestTime then
+            if elapsed < bestTime.time then
+                self.frame.timeText:SetTextColor(0, 1, 0) -- Green = ahead
             else
-                self.frame.timeText:SetTextColor(1, 1, 1)
+                self.frame.timeText:SetTextColor(1, 0.5, 0.5) -- Red = behind
             end
+        else
+            self.frame.timeText:SetTextColor(1, 1, 1)
         end
     end
     

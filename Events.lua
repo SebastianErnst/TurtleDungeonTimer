@@ -9,19 +9,26 @@ function TurtleDungeonTimer:registerEvents()
         self.eventFrame:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
         self.eventFrame:RegisterEvent("CHAT_MSG_COMBAT_FRIENDLY_DEATH")
         self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+        self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
         -- Register party member combat events
         self.eventFrame:RegisterEvent("UNIT_COMBAT")
         self.eventFrame:SetScript("OnEvent", function()
+            local timer = TurtleDungeonTimer:getInstance()
             if (event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" or event == "CHAT_MSG_COMBAT_FRIENDLY_DEATH") and arg1 then
-                TurtleDungeonTimer:getInstance():onCombatLog(arg1)
+                timer:onCombatLog(arg1)
             elseif event == "PLAYER_REGEN_DISABLED" then
                 -- Player entered combat - broadcast to group
-                TurtleDungeonTimer:getInstance():broadcastCombatStart()
+                timer:broadcastCombatStart()
+            elseif event == "PLAYER_ENTERING_WORLD" then
+                -- Player entered world (login/reload/zone) - request current run data after delay
+                timer:scheduleTimer(function()
+                    TurtleDungeonTimer:getInstance():requestCurrentRunData()
+                end, 2.0, false)
             elseif event == "UNIT_COMBAT" then
                 -- Any unit in party/raid enters combat
                 local unit = arg1
                 if unit and (string.find(unit, "party") or string.find(unit, "raid") or unit == "player") then
-                    TurtleDungeonTimer:getInstance():broadcastCombatStart()
+                    timer:broadcastCombatStart()
                 end
             end
         end)
@@ -187,11 +194,14 @@ end
 function TurtleDungeonTimer:onAllBossesDefeated()
     -- Check if trash requirement is also met (if dungeon has trash data)
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon]
-    if dungeonData and dungeonData.trashMobs then
-        if not TDTTrashCounter:isTrashComplete() then
-            -- Bosse sind tot, aber Trash nicht komplett
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Alle Bosse besiegt! Trash noch nicht komplett.", 1, 1, 0)
-            return  -- Timer läuft weiter
+    if dungeonData and self.selectedVariant then
+        local variantData = dungeonData.variants[self.selectedVariant]
+        if variantData and variantData.trashMobs then
+            if not TDTTrashCounter:isTrashComplete() then
+                -- Bosse sind tot, aber Trash nicht komplett
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Alle Bosse besiegt! Trash noch nicht komplett.", 1, 1, 0)
+                return  -- Timer läuft weiter
+            end
         end
     end
     

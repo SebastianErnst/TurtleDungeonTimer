@@ -33,5 +33,11 @@ end
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
-    TurtleDungeonTimer:getInstance():initialize()
+    local timer = TurtleDungeonTimer:getInstance()
+    timer:initialize()
+    
+    -- Request current run data from group immediately
+    timer:scheduleTimer(function()
+        TurtleDungeonTimer:getInstance():requestCurrentRunData()
+    end, 0.5, false)
 end)

@@ -4,11 +4,14 @@
 
 TurtleDungeonTimer.SYNC_PREFIX = "TDT_SYNC"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"
+TurtleDungeonTimer.SYNC_INTERVAL = 10  -- Periodic sync interval in seconds (configurable for testing)
 TurtleDungeonTimer.playersWithAddon = {}
 TurtleDungeonTimer.resetVotes = {}
 TurtleDungeonTimer.resetInitiator = nil
 TurtleDungeonTimer.resetVoteDialog = nil
 TurtleDungeonTimer.currentRunId = nil
+TurtleDungeonTimer.lastPeriodicSync = 0  -- Track last periodic sync time
+TurtleDungeonTimer.isGroupLeader = false  -- Track if we're the group leader
 
 -- ============================================================================
 -- UUID GENERATION
@@ -40,6 +43,11 @@ function TurtleDungeonTimer:onAddonCheckResponse(sender, version)
         self.preparationChecks = {}
     end
     self.preparationChecks[sender] = version or self.SYNC_VERSION
+    
+    -- Check major version compatibility
+    if version and not self:isVersionCompatible(version) then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Warnung: " .. sender .. " hat inkompatible Addon-Version (" .. version .. "). Sync könnte fehlschlagen!", 1, 0.5, 0)
+    end
 end
 
 function TurtleDungeonTimer:getAddonUserCount()
@@ -81,6 +89,7 @@ function TurtleDungeonTimer:initializeSync()
     
     self:checkForAddons()
     self:updatePrepareButtonState()
+    self:startPeriodicSync()
 end
 
 -- ============================================================================
@@ -242,6 +251,14 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
         self:onSyncReadyCheckStart(data, sender)
     elseif msgType == "READY_CHECK_RESPONSE" then
         self:onSyncReadyCheckResponse(data, sender)
+    elseif msgType == "REQUEST_CURRENT_RUN" then
+        self:onSyncRequestCurrentRun(data, sender)
+    elseif msgType == "CURRENT_RUN_DATA" then
+        self:onSyncCurrentRunData(data, sender)
+    elseif msgType == "PERIODIC_STATE" then
+        self:onPeriodicStateReceived(data, sender)
+    elseif msgType == "RUN_ID" then
+        self:onRunIdReceived(data, sender)
     end
 end
 
@@ -424,8 +441,22 @@ function TurtleDungeonTimer:onSyncBossKill(bossName, sender)
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received Boss Kill from " .. sender .. ": " .. bossName)
     end
     
-    -- Process the boss kill
-    self:onBossKilled(bossName)
+    -- Check if we already have this boss recorded to prevent duplicates after sync
+    local alreadyKilled = false
+    for j = 1, table.getn(self.killTimes) do
+        if self.killTimes[j].bossName == bossName then
+            alreadyKilled = true
+            if TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Boss bereits in killTimes - Sync ignoriert: " .. bossName)
+            end
+            break
+        end
+    end
+    
+    if not alreadyKilled then
+        -- Process the boss kill
+        self:onBossKilled(bossName)
+    end
 end
 
 -- Handle received trash kill message
@@ -564,4 +595,559 @@ function TurtleDungeonTimer:onSyncSetDungeon(data, sender)
     end
     
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Dungeon gesetzt: " .. dungeonKey .. (variantKey and (" (" .. variantKey .. ")") or ""), 0, 1, 0)
+end
+
+-- ============================================================================
+-- RUN DATA SYNC SYSTEM (for re-login)
+-- ============================================================================
+
+function TurtleDungeonTimer:requestCurrentRunData()
+    -- Only request if we're in a group and have a dungeon selected
+    if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Keine Gruppe - Sync übersprungen", 1, 1, 0)
+        end
+        return
+    end
+    
+    if not self.selectedDungeon or not self.selectedVariant then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Kein Dungeon/Variant gewählt - Sync übersprungen", 1, 1, 0)
+        end
+        return
+    end
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Sende REQUEST_CURRENT_RUN für " .. self.selectedDungeon .. "/" .. self.selectedVariant, 1, 1, 0)
+    end
+    
+    -- Initialize response tracking
+    self.runDataResponses = {}
+    self.runDataRequestTime = GetTime()
+    
+    -- Request current run data from all group members
+    self:sendSyncMessage("REQUEST_CURRENT_RUN", self.selectedDungeon .. ";" .. self.selectedVariant)
+    
+    -- Schedule processing after 2 seconds (give time for responses)
+    self:scheduleTimer(function()
+        TurtleDungeonTimer:getInstance():processRunDataResponses()
+    end, 2.0, false)
+end
+
+function TurtleDungeonTimer:onSyncRequestCurrentRun(data, sender)
+    -- Someone requested current run data - send ours if we have matching dungeon
+    if not data then return end
+    
+    local _, _, reqDungeon, reqVariant = string.find(data, "([^;]+);([^;]+)")
+    
+    if not reqDungeon or not reqVariant then return end
+    if reqDungeon ~= self.selectedDungeon or reqVariant ~= self.selectedVariant then return end
+    
+    -- Only respond if we have a running/countdown run or completed run with data
+    if not self.isRunning and not self.isCountingDown and table.getn(self.killTimes) == 0 then
+        return
+    end
+    
+    -- Build run data string
+    local runDataParts = {}
+    
+    -- 1. Dungeon and variant
+    table.insert(runDataParts, self.selectedDungeon)
+    table.insert(runDataParts, self.selectedVariant)
+    
+    -- 2. Basic run info
+    local isRunningStr = self.isRunning and "1" or "0"
+    table.insert(runDataParts, isRunningStr)
+    
+    -- 3. Is counting down
+    local isCountingDownStr = self.isCountingDown and "1" or "0"
+    table.insert(runDataParts, isCountingDownStr)
+    
+    -- 4. Elapsed time
+    local elapsedTime = 0
+    if self.isRunning and self.startTime then
+        elapsedTime = math.floor(GetTime() - self.startTime)
+    elseif self.restoredElapsedTime then
+        elapsedTime = math.floor(self.restoredElapsedTime)
+    end
+    table.insert(runDataParts, tostring(elapsedTime))
+    
+    -- 5. Death count
+    table.insert(runDataParts, tostring(self.deathCount))
+    
+    -- 6. Boss kills (count only - detailed sync happens via normal BOSS_KILL messages)
+    table.insert(runDataParts, tostring(table.getn(self.killTimes)))
+    
+    -- 7. Trash progress and absolute HP (if available)
+    local trashProgress = 0
+    local trashKilledHP = 0
+    if TDTTrashCounter then
+        trashProgress, trashKilledHP = TDTTrashCounter:getProgress()
+    end
+    table.insert(runDataParts, string.format("%.1f", trashProgress))
+    table.insert(runDataParts, tostring(trashKilledHP))  -- Send absolute HP
+    
+    -- Send as semicolon-separated string
+    local runData = table.concat(runDataParts, ";")
+    self:sendSyncMessage("CURRENT_RUN_DATA", runData)
+end
+
+function TurtleDungeonTimer:onSyncCurrentRunData(data, sender)
+    if not self.runDataResponses then
+        self.runDataResponses = {}
+    end
+    
+    -- Parse run data
+    local parts = {}
+    for part in string.gfind(data .. ";", "([^;]*);") do
+        table.insert(parts, part)
+    end
+    
+    if table.getn(parts) < 8 then return end
+    
+    local runData = {
+        dungeon = parts[1],
+        variant = parts[2],
+        isRunning = (parts[3] == "1"),
+        isCountingDown = (parts[4] == "1"),
+        elapsedTime = tonumber(parts[5]) or 0,
+        deathCount = tonumber(parts[6]) or 0,
+        bossKills = tonumber(parts[7]) or 0,
+        trashProgress = tonumber(parts[8]) or 0,
+        trashKilledHP = tonumber(parts[9]) or 0,  -- Parse absolute HP
+        sender = sender
+    }
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Empfangen von " .. sender, 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] isRunning: " .. tostring(runData.isRunning), 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] isCountingDown: " .. tostring(runData.isCountingDown), 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] elapsedTime: " .. tostring(runData.elapsedTime), 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] bossKills: " .. tostring(runData.bossKills), 1, 1, 0)
+    end
+    
+    table.insert(self.runDataResponses, runData)
+end
+
+function TurtleDungeonTimer:processRunDataResponses()
+    if not self.runDataResponses or table.getn(self.runDataResponses) == 0 then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Keine Antworten erhalten", 1, 1, 0)
+        end
+        return
+    end
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Verarbeite " .. tostring(table.getn(self.runDataResponses)) .. " Antworten", 1, 1, 0)
+    end
+    
+    -- Find the most advanced run state
+    local bestResponse = nil
+    local maxProgress = -1
+    
+    for i, response in ipairs(self.runDataResponses) do
+        -- Calculate progress score (more bosses = higher priority)
+        local progress = response.bossKills * 1000 + response.trashProgress
+        
+        if progress > maxProgress then
+            maxProgress = progress
+            bestResponse = response
+        end
+    end
+    
+    if not bestResponse then
+        self.runDataResponses = nil
+        return
+    end
+    
+    -- Mark countdown sync flag if needed
+    if self.wasInCountdown then
+        self.syncReceivedCountdownData = true
+        self.wasInCountdown = false
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] wasInCountdown Flag zurückgesetzt", 1, 1, 0)
+        end
+    end
+    
+    -- Convert response to same format as PERIODIC_STATE for unified merge logic
+    local remoteState = {
+        sender = bestResponse.sender,
+        dungeon = bestResponse.dungeon,
+        variant = bestResponse.variant,
+        runId = bestResponse.runId or "",
+        isRunning = bestResponse.isRunning,
+        isCountingDown = bestResponse.isCountingDown,
+        elapsedTime = bestResponse.elapsedTime,
+        deathCount = bestResponse.deathCount,
+        trashProgress = bestResponse.trashProgress,
+        trashKilledHP = bestResponse.trashKilledHP,
+        killTimesData = bestResponse.killTimesData or "",
+        timestamp = bestResponse.timestamp
+    }
+    
+    -- Use the same merge logic as periodic sync (Best-of-All)
+    self:mergeRemoteState(remoteState)
+    
+    -- Notify user about login sync
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Login-Sync abgeschlossen von " .. bestResponse.sender, 1, 1, 0)
+    end
+    
+    -- Clear response data
+    self.runDataResponses = nil
+end
+
+-- ============================================================================
+-- PERIODIC SYNC SYSTEM (NEW)
+-- ============================================================================
+
+function TurtleDungeonTimer:startPeriodicSync()
+    -- Schedule periodic sync check
+    self:scheduleTimer(function()
+        TurtleDungeonTimer:getInstance():periodicSyncCheck()
+    end, self.SYNC_INTERVAL, true)
+end
+
+function TurtleDungeonTimer:periodicSyncCheck()
+    -- Only sync if in group and have dungeon selected
+    if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
+        return
+    end
+    
+    if not self.selectedDungeon or not self.selectedVariant then
+        return
+    end
+    
+    -- Broadcast our current state for "Best-of-All" merge
+    self:broadcastCompleteState()
+end
+
+function TurtleDungeonTimer:broadcastCompleteState()
+    if not self.selectedDungeon or not self.selectedVariant then
+        return
+    end
+    
+    -- Build complete state data
+    local stateParts = {}
+    
+    -- 1. Dungeon and variant
+    table.insert(stateParts, self.selectedDungeon)
+    table.insert(stateParts, self.selectedVariant)
+    
+    -- 2. Run ID
+    table.insert(stateParts, self.currentRunId or "")
+    
+    -- 3. Timer state
+    local isRunningStr = self.isRunning and "1" or "0"
+    table.insert(stateParts, isRunningStr)
+    
+    local isCountingDownStr = self.isCountingDown and "1" or "0"
+    table.insert(stateParts, isCountingDownStr)
+    
+    -- 4. Elapsed time
+    local elapsedTime = 0
+    if self.isRunning and self.startTime then
+        elapsedTime = math.floor(GetTime() - self.startTime)
+    elseif self.restoredElapsedTime then
+        elapsedTime = math.floor(self.restoredElapsedTime)
+    end
+    table.insert(stateParts, tostring(elapsedTime))
+    
+    -- 5. Death count
+    table.insert(stateParts, tostring(self.deathCount))
+    
+    -- 6. Trash progress
+    local trashProgress = 0
+    local trashKilledHP = 0
+    if TDTTrashCounter then
+        trashProgress, trashKilledHP = TDTTrashCounter:getProgress()
+    end
+    table.insert(stateParts, string.format("%.1f", trashProgress))
+    table.insert(stateParts, tostring(trashKilledHP))  -- Send absolute HP value
+    
+    -- 7. Boss kills (serialize killTimes array)
+    local killTimesData = self:serializeKillTimes()
+    table.insert(stateParts, killTimesData)
+    
+    -- 8. Timestamp (for conflict resolution)
+    table.insert(stateParts, tostring(time()))
+    
+    -- Send state
+    local stateData = table.concat(stateParts, ";")
+    self:sendSyncMessage("PERIODIC_STATE", stateData)
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Broadcast complete state", 1, 1, 0)
+    end
+end
+
+function TurtleDungeonTimer:serializeKillTimes()
+    if table.getn(self.killTimes) == 0 then
+        return ""
+    end
+    
+    local parts = {}
+    for i, killData in ipairs(self.killTimes) do
+        -- Format: bossName:time:index:splitTime
+        local entry = killData.bossName .. ":" .. 
+                      math.floor(killData.time) .. ":" .. 
+                      killData.index .. ":" .. 
+                      math.floor(killData.splitTime or 0)
+        table.insert(parts, entry)
+    end
+    
+    return table.concat(parts, ",")
+end
+
+function TurtleDungeonTimer:deserializeKillTimes(data)
+    if not data or data == "" then
+        return {}
+    end
+    
+    local killTimes = {}
+    for entry in string.gfind(data .. ",", "([^,]*),") do
+        if entry ~= "" then
+            local parts = {}
+            for part in string.gfind(entry .. ":", "([^:]*):") do
+                table.insert(parts, part)
+            end
+            
+            if table.getn(parts) >= 4 then
+                table.insert(killTimes, {
+                    bossName = parts[1],
+                    time = tonumber(parts[2]) or 0,
+                    index = tonumber(parts[3]) or 0,
+                    splitTime = tonumber(parts[4]) or 0
+                })
+            end
+        end
+    end
+    
+    return killTimes
+end
+
+function TurtleDungeonTimer:onPeriodicStateReceived(data, sender)
+    if not data then return end
+    
+    -- Parse state data
+    local parts = {}
+    for part in string.gfind(data .. ";", "([^;]*);") do
+        table.insert(parts, part)
+    end
+    
+    if table.getn(parts) < 10 then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Invalid periodic state data from " .. sender, 1, 0, 0)
+        end
+        return
+    end
+    
+    local remoteState = {
+        dungeon = parts[1],
+        variant = parts[2],
+        runId = parts[3],
+        isRunning = (parts[4] == "1"),
+        isCountingDown = (parts[5] == "1"),
+        elapsedTime = tonumber(parts[6]) or 0,
+        deathCount = tonumber(parts[7]) or 0,
+        trashProgress = tonumber(parts[8]) or 0,
+        trashKilledHP = tonumber(parts[9]) or 0,  -- Parse absolute HP
+        killTimesData = parts[10],
+        timestamp = tonumber(parts[11]) or 0,
+        sender = sender
+    }
+    
+    -- Only process if same dungeon/variant
+    if remoteState.dungeon ~= self.selectedDungeon or remoteState.variant ~= self.selectedVariant then
+        return
+    end
+    
+    -- Merge using "Best-of-All" strategy
+    self:mergeRemoteState(remoteState)
+end
+
+function TurtleDungeonTimer:mergeRemoteState(remoteState)
+    local updated = false
+    local updateReasons = {}
+    
+    -- 1. Sync Run ID (if we don't have one yet)
+    if not self.currentRunId and remoteState.runId and remoteState.runId ~= "" then
+        self.currentRunId = remoteState.runId
+        updated = true
+        table.insert(updateReasons, "Run-ID \u00fcbernommen")
+    end
+    
+    -- 2. Timer: Take highest (furthest progressed)
+    if remoteState.elapsedTime > 0 then
+        local ourElapsed = 0
+        if self.isRunning and self.startTime then
+            ourElapsed = GetTime() - self.startTime
+        elseif self.restoredElapsedTime then
+            ourElapsed = self.restoredElapsedTime
+        end
+        
+        if remoteState.elapsedTime > ourElapsed then
+            if remoteState.isRunning then
+                self.isRunning = true
+                self.startTime = GetTime() - remoteState.elapsedTime
+                self.restoredElapsedTime = nil
+            else
+                self.isRunning = false
+                self.restoredElapsedTime = remoteState.elapsedTime
+                self.startTime = nil
+            end
+            updated = true
+            table.insert(updateReasons, "Timer: " .. math.floor(ourElapsed) .. "s \u2192 " .. remoteState.elapsedTime .. "s")
+        end
+    end
+    
+    -- 3. Deaths: Take highest (more information)
+    if remoteState.deathCount > self.deathCount then
+        self.deathCount = remoteState.deathCount
+        updated = true
+        table.insert(updateReasons, "Tode: +" .. (remoteState.deathCount - self.deathCount))
+        
+        if self.frame and self.frame.deathText then
+            self.frame.deathText:SetText("" .. self.deathCount)
+        end
+    end
+    
+    -- 4. Trash: Take highest (compare absolute HP to avoid rounding issues)
+    local ourTrashProgress, ourTrashHP = 0, 0
+    if TDTTrashCounter then
+        ourTrashProgress, ourTrashHP = TDTTrashCounter:getProgress()
+    end
+    
+    -- Only update if remote has significantly more trash killed (> 1 HP difference)
+    -- This prevents floating-point rounding from causing infinite sync loops
+    if remoteState.trashKilledHP > (ourTrashHP + 1) and TDTTrashCounter then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Trash HP: " .. ourTrashHP .. " -> " .. remoteState.trashKilledHP, 1, 1, 0)
+        end
+        
+        TDTTrashCounter:setTrashHP(remoteState.trashKilledHP)
+        updated = true
+        table.insert(updateReasons, "Trash: " .. math.floor(ourTrashProgress) .. "% -> " .. math.floor(remoteState.trashProgress) .. "%")
+    end
+    
+    -- 5. Boss Kills: Merge killTimes (take latest times for each boss)
+    if remoteState.killTimesData and remoteState.killTimesData ~= "" then
+        local remoteKillTimes = self:deserializeKillTimes(remoteState.killTimesData)
+        local mergedKills = self:mergeKillTimes(self.killTimes, remoteKillTimes)
+        
+        if table.getn(mergedKills) > table.getn(self.killTimes) then
+            self.killTimes = mergedKills
+            updated = true
+            table.insert(updateReasons, "Boss-Kills: +" .. (table.getn(mergedKills) - table.getn(self.killTimes)))
+            
+            -- Update UI
+            self:updateBossRows()
+        end
+    end
+    
+    -- 6. Countdown state
+    if remoteState.isCountingDown and not self.isCountingDown then
+        self.isCountingDown = true
+        updated = true
+        table.insert(updateReasons, "Countdown gestartet")
+    end
+    
+    -- Save and notify if anything was updated
+    if updated then
+        self:saveLastRun()
+        self:updateTimerDisplay()
+        
+        if TurtleDungeonTimerDB.debug then
+            local reasonStr = table.concat(updateReasons, ", ")
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Periodic Merge von " .. remoteState.sender .. ": " .. reasonStr, 1, 1, 0)
+        end
+    end
+end
+
+function TurtleDungeonTimer:mergeKillTimes(ours, theirs)
+    -- Create a map of boss index -> kill data
+    local killMap = {}
+    
+    -- Add our kills
+    for i, killData in ipairs(ours) do
+        if not killMap[killData.index] or killData.time > killMap[killData.index].time then
+            killMap[killData.index] = killData
+        end
+    end
+    
+    -- Merge their kills (take latest times)
+    for i, killData in ipairs(theirs) do
+        if not killMap[killData.index] or killData.time > killMap[killData.index].time then
+            killMap[killData.index] = killData
+        end
+    end
+    
+    -- Convert map back to array, sorted by index
+    local merged = {}
+    for index, killData in pairs(killMap) do
+        table.insert(merged, killData)
+    end
+    
+    table.sort(merged, function(a, b)
+        return a.index < b.index
+    end)
+    
+    return merged
+end
+
+-- ============================================================================
+-- RUN-ID SYSTEM
+-- ============================================================================
+
+function TurtleDungeonTimer:broadcastRunId()
+    if not self.currentRunId then
+        -- Generate new Run ID
+        self.currentRunId = self:generateRunId()
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Generated Run-ID: " .. self.currentRunId, 1, 1, 0)
+        end
+    end
+    
+    -- Broadcast to group
+    self:sendSyncMessage("RUN_ID", self.currentRunId)
+end
+
+function TurtleDungeonTimer:onRunIdReceived(runId, sender)
+    if not runId or runId == "" then
+        return
+    end
+    
+    -- Accept Run ID if we don't have one yet
+    if not self.currentRunId then
+        self.currentRunId = runId
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Run-ID empfangen von " .. sender .. ": " .. runId, 1, 1, 0)
+        end
+    end
+end
+
+function TurtleDungeonTimer:clearRunId()
+    self.currentRunId = nil
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Run-ID gel\u00f6scht", 1, 1, 0)
+    end
+end
+
+-- ============================================================================
+-- VERSION COMPATIBILITY CHECK
+-- ============================================================================
+
+function TurtleDungeonTimer:isVersionCompatible(theirVersion)
+    -- Extract major version (first number before first dot)
+    local _, _, myMajor = string.find(self.SYNC_VERSION, "^(%d+)")
+    local _, _, theirMajor = string.find(theirVersion, "^(%d+)")
+    
+    myMajor = tonumber(myMajor) or 0
+    theirMajor = tonumber(theirMajor) or 0
+    
+    return myMajor == theirMajor
 end

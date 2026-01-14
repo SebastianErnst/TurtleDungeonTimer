@@ -15,22 +15,22 @@ TurtleDungeonTimer.DUNGEON_DATA = {
         isDungeon = true,
         variants = {
             ["Default"] = {
-                bosses = {"Aszosh Grimflame", "Tham'Grarr", "Black Bride", "Damian", "Volkan Cruelblade", "Arc'tiras"}
+                bosses = {"Aszosh Grimflame", "Tham'Grarr", "Black Bride", "Damian", "Volkan Cruelblade", "Arc'tiras"},
+                trashMobs = {
+                    {name = "Black Blood of the Dragonmaw", hp = 13115, count = 9},    -- 118035
+                    {name = "Grellkin Scorcher", hp = 12378, count = 19},              -- 235182
+                    {name = "Grellkin Sorcerer", hp = 12367, count = 17},              -- 210239
+                    {name = "Maddened Vault Guard", hp = 12345, count = 13},           -- 160485
+                    {name = "Manacrazed Grell", hp = 12298, count = 15},               -- 184470
+                    {name = "Runic Construct", hp = 19898, count = 2},                 -- 39796
+                    {name = "Shadow Creeper", hp = 16048, count = 12},                 -- 192576
+                    {name = "Soulless Husk", hp = 13357, count = 15},                  -- 200355
+                    {name = "Wicked Skitterer", hp = 13851, count = 13}                -- 180063
+                },
+                totalTrashHP = 1521201,  -- Total: 118035 + 235182 + 210239 + 160485 + 184470 + 39796 + 192576 + 200355 + 180063
+                trashRequiredPercent = 65  -- 80% required for completion
             }
-        },
-        trashMobs = {
-            {name = "Black Blood of the Dragonmaw", hp = 13115, count = 9},    -- 118035
-            {name = "Grellkin Scorcher", hp = 12378, count = 19},              -- 235182
-            {name = "Grellkin Sorcerer", hp = 12367, count = 17},              -- 210239
-            {name = "Maddened Vault Guard", hp = 12345, count = 13},           -- 160485
-            {name = "Manacrazed Grell", hp = 12298, count = 15},               -- 184470
-            {name = "Runic Construct", hp = 19898, count = 2},                 -- 39796
-            {name = "Shadow Creeper", hp = 16048, count = 12},                 -- 192576
-            {name = "Soulless Husk", hp = 13357, count = 15},                  -- 200355
-            {name = "Wicked Skitterer", hp = 13851, count = 13}                -- 180063
-        },
-        totalTrashHP = 1521201,  -- Total: 118035 + 235182 + 210239 + 160485 + 184470 + 39796 + 192576 + 200355 + 180063
-        trashRequiredPercent = 65  -- 80% required for completion
+        }
     },
     ["Stratholme"] = {
         isDungeon = true,
@@ -60,8 +60,57 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                 optionalBosses = {
                     ["Tsu'zee"] = true, -- Rare
                     ["Lord Hel'nurath"] = true -- Rare
+                },
+                trashRequiredPercent = 50,
+                totalTrashHP = 1931400,
+                trashMobs = {
+            {name = "Arcane Feedback", level = 57, hp = 1962, count = 4},
+            {name = "Arcane Feedback", level = 58, hp = 2024, count = 6},
+            {name = "Arcane Feedback", level = 59, hp = 2086, count = 4},
+            {name = "Arcane Feedback", level = 60, hp = 2148, count = 1},
+            {name = "Arcane Torrent", level = 58, hp = 17687, count = 3},
+            {name = "Arcane Torrent", level = 59, hp = 18245, count = 1},
+            {name = "Arcane Torrent", level = 60, hp = 18803, count = 1},
+            {name = "Eldreth Apparition", level = 56, hp = 7125, count = 3},
+            {name = "Eldreth Apparition", level = 57, hp = 7352, count = 6},
+            {name = "Eldreth Apparition", level = 58, hp = 7580, count = 4},
+            {name = "Eldreth Darter", level = 58, hp = 7580, count = 7},
+            {name = "Eldreth Darter", level = 59, hp = 7818, count = 3},
+            {name = "Eldreth Phantasm", level = 57, hp = 9187, count = 4},
+            {name = "Eldreth Phantasm", level = 58, hp = 9479, count = 3},
+            {name = "Eldreth Phantasm", level = 59, hp = 9771, count = 5},
+            {name = "Eldreth Seether", level = 58, hp = 9474, count = 6},
+            {name = "Eldreth Seether", level = 59, hp = 9771, count = 8},
+            {name = "Eldreth Sorcerer", level = 58, hp = 7580, count = 13},
+            {name = "Eldreth Sorcerer", level = 59, hp = 7818, count = 5},
+            {name = "Eldreth Spectre", level = 56, hp = 7125, count = 5},
+            {name = "Eldreth Spectre", level = 57, hp = 7356, count = 3},
+            {name = "Eldreth Spectre", level = 58, hp = 7587, count = 4},
+            {name = "Eldreth Spectre", level = 59, hp = 7818, count = 4},
+            {name = "Eldreth Spirit", level = 57, hp = 9187, count = 10},
+            {name = "Eldreth Spirit", level = 58, hp = 9474, count = 6},
+            {name = "Ironbark Protector", level = 57, hp = 18374, count = 3},
+            {name = "Ironbark Protector", level = 58, hp = 18958, count = 2},
+            {name = "Ironbark Protector", level = 59, hp = 19543, count = 3},
+            {name = "Mana Remnant", level = 57, hp = 7349, count = 4},
+            {name = "Mana Remnant", level = 58, hp = 7583, count = 6},
+            {name = "Mana Remnant", level = 59, hp = 7818, count = 10},
+            {name = "Petrified Guardian", level = 57, hp = 7656, count = 6},
+            {name = "Petrified Guardian", level = 58, hp = 7899, count = 2},
+            {name = "Petrified Guardian", level = 59, hp = 8142, count = 5},
+            {name = "Petrified Treant", level = 57, hp = 9187, count = 1},
+            {name = "Petrified Treant", level = 58, hp = 9479, count = 7},
+            {name = "Petrified Treant", level = 59, hp = 9771, count = 4},
+            {name = "Residual Monstrosity", level = 59, hp = 15635, count = 8},
+            {name = "Residual Monstrosity", level = 60, hp = 16117, count = 10},
+            {name = "Rotting Highborne", level = 57, hp = 3981, count = 7},
+            {name = "Rotting Highborne", level = 58, hp = 4107, count = 6},
+            {name = "Rotting Highborne", level = 59, hp = 4234, count = 4},
+            {name = "Skeletal Highborne", level = 57, hp = 3981, count = 9},
+            {name = "Skeletal Highborne", level = 58, hp = 4105, count = 15},
+            {name = "Warpwood Treant", level = 54, hp = 8869, count = 1}
                 }
-            },
+            }
             -- ["North"] = {
             --     bosses = {"Guard Mol'dar", "Stomper Kreeg", "Guard Fengus", "Guard Slip'kik", "Captain Kromcrush", "Cho'Rush the Observer", "King Gordok"}
             -- }
@@ -106,23 +155,23 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                 bosses = {"Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward"},
                 optionalBosses = {
                     ["Bruegal Ironknuckle"] = true -- Rare
-                }
+                },
+                trashMobs = {
+                    {name = "Defias Captive", hp = 2323, count = 7},
+                    {name = "Defias Inmate", hp = 2323, count = 21},
+                    {name = "Defias Prisoner", hp = 2160, count = 7},
+                    {name = "Defias Prisoner", hp = 2323, count = 6},
+                    {name = "Defias Captive", hp = 2160, count = 11},            
+                    {name = "Defias Convict", hp = 2323, count = 7},
+                    {name = "Defias Convict", hp = 2495, count = 6},
+                    {name = "Defias Inmate", hp = 2495, count = 15},
+                    {name = "Defias Insurgent", hp = 2495, count = 5},            
+                    {name = "Defias Insurgent", hp = 2677, count = 5}
+                },
+                totalTrashHP = 212378,  -- Total: (2323*7 + 2323*21 + 2160*7 + 2160*11 + 2323*6 + 2323*7 + 2495*15 + 2495*5 + 2495*6 + 2677*5)
+                trashRequiredPercent = 50  -- 50% for testing, normally 80-100%
             }
-        },
-        trashMobs = {
-            {name = "Defias Captive", hp = 2323, count = 7},
-            {name = "Defias Inmate", hp = 2323, count = 21},
-            {name = "Defias Prisoner", hp = 2160, count = 7},
-            {name = "Defias Prisoner", hp = 2323, count = 6},
-            {name = "Defias Captive", hp = 2160, count = 11},            
-            {name = "Defias Convict", hp = 2323, count = 7},
-            {name = "Defias Convict", hp = 2495, count = 6},
-            {name = "Defias Inmate", hp = 2495, count = 15},
-            {name = "Defias Insurgent", hp = 2495, count = 5},            
-            {name = "Defias Insurgent", hp = 2677, count = 5},
-        },
-        totalTrashHP = 212378,  -- Total: (2323*7 + 2323*21 + 2160*7 + 2160*11 + 2323*6 + 2323*7 + 2495*15 + 2495*5 + 2495*6 + 2677*5)
-        trashRequiredPercent = 50  -- 50% for testing, normally 80-100%
+        }
     }
     -- -- CLASSIC DUNGEONS
     -- ["Ragefire Chasm"] = {
