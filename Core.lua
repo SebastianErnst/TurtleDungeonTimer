@@ -10,7 +10,7 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- ============================================================================
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
 -- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "1.0.6-alpha"
+TurtleDungeonTimer.ADDON_VERSION = "1.0.7-alpha"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil
@@ -58,6 +58,8 @@ function TurtleDungeonTimer:new()
     self.hasWorldBuffs = false
     self.hasCheckedWorldBuffs = false
     self.worldBuffPlayers = {}
+    self.runWorldBuffPlayers = {}     -- World Buffs at run start (for tooltip during run)
+    self.runWithWorldBuffs = nil      -- Run marked with World Buffs (permanent during run)
     
     -- Initialize database
     self:initializeDatabase()
@@ -93,6 +95,11 @@ function TurtleDungeonTimer:initializeDatabase()
     -- Ensure history exists for old saves
     if not TurtleDungeonTimerDB.history then
         TurtleDungeonTimerDB.history = {}
+    end
+    
+    -- Ensure lastSelection table exists for old saves
+    if not TurtleDungeonTimerDB.lastSelection then
+        TurtleDungeonTimerDB.lastSelection = {}
     end
     
     -- Ensure position table exists for old saves
@@ -188,6 +195,9 @@ function TurtleDungeonTimer:initialize()
     -- Initialize trash counter
     TDTTrashCounter:initialize()
     
+    -- Start World Buff scanning (runs continuously)
+    self:startWorldBuffScanning()
+    
     -- Load last selection
     if TurtleDungeonTimerDB.lastSelection.dungeon then
         self:selectDungeon(TurtleDungeonTimerDB.lastSelection.dungeon)
@@ -233,6 +243,9 @@ function TurtleDungeonTimer:show()
     if self.frame then
         self.frame:Show()
         TurtleDungeonTimerDB.visible = true
+        
+        -- Update World Buffs indicator when showing UI
+        self:updateWorldBuffsIndicator()
     end
 end
 
@@ -251,6 +264,9 @@ function TurtleDungeonTimer:toggle()
         else
             self.frame:Show()
             TurtleDungeonTimerDB.visible = true
+            
+            -- Update World Buffs indicator when showing UI
+            self:updateWorldBuffsIndicator()
         end
     end
 end

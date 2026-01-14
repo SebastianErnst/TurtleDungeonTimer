@@ -96,12 +96,61 @@ function TurtleDungeonTimer:createDebugFrame()
         return btn
     end
     
+    -- Helper function to create category headers
+    local function createCategory(text)
+        local header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        header:SetPoint("TOP", scrollChild, "TOP", 0, yOffset - 5)
+        header:SetText("|cffaaaaaa--- " .. text .. " ---|r")
+        header:SetJustifyH("CENTER")
+        yOffset = yOffset - 25
+    end
+    
+    -- === DEBUG MODE ===
+    createCategory("Debug Mode")
+    
+    createButton("Toggle Debug Mode", function()
+        TurtleDungeonTimer:getInstance():toggleDebugMode()
+    end)
+    
+    createButton("Toggle Event Debug", function()
+        TurtleDungeonTimerDB.debug = not TurtleDungeonTimerDB.debug
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Event Debug: " .. tostring(TurtleDungeonTimerDB.debug), 0, 1, 0)
+    end)
+    
+    yOffset = yOffset - 10
+    
+    -- === DATA MANAGEMENT ===
+    createCategory("Data Management")
+    
+    createButton("Clear Run History", function()
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.history then
+            TurtleDungeonTimerDB.history = {}
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Run history cleared!", 0, 1, 0)
+        end
+    end)
+    
+    createButton("Reset All Saved Data", function()
+        TurtleDungeonTimerDB = {
+            x = 0,
+            y = 0,
+            minimapPos = 180,
+            lastRun = {},
+            history = {},
+            debug = false
+        }
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r All saved data has been reset!", 0, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Please /reload to apply changes", 1, 1, 0)
+    end)
+    
+    yOffset = yOffset - 10
+    
     -- === MAIN CONTROLS ===
+    createCategory("Main Controls")
     createButton("Start/Reset Dungeon", function()
         local timer = TurtleDungeonTimer:getInstance()
         if timer.isRunning then
             timer:performResetDirect()
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Dungeon zurückgesetzt")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_DUNGEON_RESET"))
         else
             if timer:isGroupLeader() then
                 timer:startPreparation()
@@ -115,11 +164,11 @@ function TurtleDungeonTimer:createDebugFrame()
     createButton("Start Countdown (10s)", function()
         local timer = TurtleDungeonTimer:getInstance()
         if timer.isRunning then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer läuft bereits!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_TIMER_ALREADY_RUNNING"))
             return
         end
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         
@@ -131,11 +180,11 @@ function TurtleDungeonTimer:createDebugFrame()
     createButton("Start Timer Immediately", function()
         local timer = TurtleDungeonTimer:getInstance()
         if timer.isRunning then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer läuft bereits!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_TIMER_ALREADY_RUNNING"))
             return
         end
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         
@@ -144,12 +193,19 @@ function TurtleDungeonTimer:createDebugFrame()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Timer direkt gestartet!")
     end)
     
+    yOffset = yOffset - 10
+    
+    -- === TRASH CONTROLS ===
+    createCategory("Trash Controls")
+    
     createButton("Open Trash List Window", function()
         TDTTrashScanner:showListWindow()
     end)
-    createButton("Open Trash List Window", function()
-        TDTTrashScanner:showListWindow()
-    end)
+    
+    yOffset = yOffset - 10
+    
+    -- === GROUP & BUFFS ===
+    createCategory("Group & Buffs")
     
     createButton("Group Status", function()
         local timer = TurtleDungeonTimer:getInstance()
@@ -190,11 +246,15 @@ function TurtleDungeonTimer:createDebugFrame()
         end
     end)
     
+    yOffset = yOffset - 10
+    
     -- === TRASH DEBUG ===
+    createCategory("Trash Percentage")
+    
     createButton("Add 1% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
@@ -217,13 +277,13 @@ function TurtleDungeonTimer:createDebugFrame()
         local addHP = (variantData.totalTrashHP * requiredPercent / 100) * 0.01
         TDTTrashCounter:addTrashHP(addHP)
         local progress = TDTTrashCounter:getProgress()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +1% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. string.format(TDT_L("DEBUG_TRASH_ADDED"), 1, progress))
     end)
     
     createButton("Add 5% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
@@ -246,13 +306,13 @@ function TurtleDungeonTimer:createDebugFrame()
         local addHP = (variantData.totalTrashHP * requiredPercent / 100) * 0.05
         TDTTrashCounter:addTrashHP(addHP)
         local progress = TDTTrashCounter:getProgress()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +5% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. string.format(TDT_L("DEBUG_TRASH_ADDED"), 5, progress))
     end)
     
     createButton("Add 100% Trash", function()
         local timer = TurtleDungeonTimer:getInstance()
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         local dungeonData = timer.DUNGEON_DATA[timer.selectedDungeon]
@@ -275,20 +335,24 @@ function TurtleDungeonTimer:createDebugFrame()
         local addHP = (variantData.totalTrashHP * requiredPercent / 100) * 1.0
         TDTTrashCounter:addTrashHP(addHP)
         local progress = TDTTrashCounter:getProgress()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r +100% Trash hinzugefügt (Total: " .. string.format("%.2f%%", progress) .. ")")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. string.format(TDT_L("DEBUG_TRASH_ADDED"), 100, progress))
     end)
     
+    yOffset = yOffset - 10
+    
     -- === BOSS DEBUG ===
+    createCategory("Boss Controls")
+    
     createButton("Kill One Random Boss", function()
         local timer = TurtleDungeonTimer:getInstance()
         
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         
         if table.getn(timer.bossList) == 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Bosse geladen!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_BOSSES_LOADED"))
             return
         end
         
@@ -351,12 +415,12 @@ function TurtleDungeonTimer:createDebugFrame()
         local timer = TurtleDungeonTimer:getInstance()
         
         if not timer.selectedDungeon or not timer.selectedVariant then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         
         if table.getn(timer.bossList) == 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Keine Bosse geladen!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_BOSSES_LOADED"))
             return
         end
         
@@ -368,7 +432,7 @@ function TurtleDungeonTimer:createDebugFrame()
         local baseTime = timer.startTime or currentTime
         local bossInterval = 30 -- 30 seconds between boss kills
         
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Töte alle Bosse...")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_KILL_ALL_BOSSES"))
         
         for i = 1, table.getn(timer.bossList) do
             local boss = timer.bossList[i]
@@ -396,7 +460,7 @@ function TurtleDungeonTimer:createDebugFrame()
         end
         
         timer:saveLastRun()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r Alle Bosse getötet!")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[DEBUG]|r " .. TDT_L("DEBUG_ALL_BOSSES_KILLED"))
         
         -- Trigger trash check to see if run is complete
         TDTTrashCounter:checkRunCompletion()
@@ -406,7 +470,7 @@ function TurtleDungeonTimer:createDebugFrame()
         local timer = TurtleDungeonTimer:getInstance()
         
         if not timer.selectedDungeon then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r Kein Dungeon ausgewählt!")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[DEBUG]|r " .. TDT_L("DEBUG_NO_DUNGEON_SELECTED"))
             return
         end
         
@@ -482,21 +546,13 @@ function TurtleDungeonTimer:toggleDebugMode()
     
     if self.debugMode then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Debug Mode AKTIVIERT", 1, 0, 0)
-        self:createDebugFrame()
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Debug Mode DEAKTIVIERT", 1, 1, 1)
-        if self.debugFrame then
-            self.debugFrame:Hide()
-        end
     end
 end
 
 function TurtleDungeonTimer:showDebugFrame()
-    if self.debugMode then
-        self:createDebugFrame()
-    else
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Debug Mode ist nicht aktiv. Benutze /tdt debug", 1, 0.5, 0)
-    end
+    self:createDebugFrame()
 end
 
 -- ============================================================================

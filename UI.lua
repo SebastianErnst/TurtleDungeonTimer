@@ -285,7 +285,7 @@ function TurtleDungeonTimer:createHeader()
     dungeonName:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 15, -15)
     dungeonName:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
     dungeonName:SetTextColor(1, 1, 1)
-    dungeonName:SetText("Select Dungeon...")
+    dungeonName:SetText(TDT_L("UI_LEADER_SELECT_DUNGEON"))
     dungeonName:SetJustifyH("LEFT")
     dungeonName:SetWidth(145)
     self.frame.dungeonNameText = dungeonName
@@ -316,22 +316,39 @@ function TurtleDungeonTimer:createHeader()
     startBtnText:SetText("Start")
     startBtnText:SetTextColor(1, 1, 1)
     startBtn.text = startBtnText
+    
+    -- Store reference for later updates
+    self.frame.startBtn = startBtn
+    
+    -- Update button appearance based on leadership status
+    self:updateStartButton()
 
     startBtn:SetScript("OnClick", function()
         local timer = TurtleDungeonTimer:getInstance()
 
-        -- If running, pause the timer
-        if timer.isRunning then
-            timer:pause()
+        -- Check if button should show "Abort" (timer running OR preparation complete)
+        local shouldShowAbort = timer.isRunning or 
+                               (timer.preparationState == "RESETTING" or 
+                                timer.preparationState == "READY" or 
+                                timer.preparationState == "COUNTDOWN")
+
+        -- If abort mode, show abort confirmation dialog
+        if shouldShowAbort then
+            if timer:isGroupLeader() then
+                timer:showAbortConfirmationDialog()
+            else
+                DEFAULT_CHAT_FRAME:AddMessage(
+                "|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_ABORT"), 1, 0, 0)
+            end
             return
         end
 
-        -- If group leader and not running, start preparation
+        -- If group leader and not in abort mode, start preparation
         if timer:isGroupLeader() then
             timer:startPreparation()
         else
             DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffff0000[Turtle Dungeon Timer]|r Nur der Gruppenführer kann den Run starten!", 1, 0, 0)
+            "|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_START"), 1, 0, 0)
         end
     end)
 
@@ -341,17 +358,17 @@ function TurtleDungeonTimer:createHeader()
         GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
 
         if timer.isRunning then
-            GameTooltip:SetText("Timer stoppen", 1, 0.82, 0)
+            GameTooltip:SetText(TDT_L("TOOLTIP_STOP_TIMER"), 1, 0.82, 0)
         else
-            GameTooltip:SetText("Run vorbereiten", 1, 0.82, 0)
+            GameTooltip:SetText(TDT_L("TOOLTIP_PREPARE_RUN"), 1, 0.82, 0)
             if timer:isGroupLeader() then
-                GameTooltip:AddLine("Startet einen frischen Run mit Dungeon-Reset.", 1, 1, 1, 1)
+                GameTooltip:AddLine(TDT_L("TOOLTIP_PREPARE_RUN_DESC"), 1, 1, 1, 1)
                 GameTooltip:AddLine(" ", 1, 1, 1, 1)
-                GameTooltip:AddLine("Requirements:", 0.8, 0.8, 0.8, 1)
-                GameTooltip:AddLine("- Alle haben das Addon (gleiche Version)", 1, 1, 1, 1)
-                GameTooltip:AddLine("- Niemand darf im Dungeon sein", 1, 1, 1, 1)
+                GameTooltip:AddLine(TDT_L("TOOLTIP_REQUIREMENTS"), 0.8, 0.8, 0.8, 1)
+                GameTooltip:AddLine(TDT_L("TOOLTIP_ALL_HAVE_ADDON"), 1, 1, 1, 1)
+                GameTooltip:AddLine(TDT_L("TOOLTIP_NO_ONE_IN_DUNGEON"), 1, 1, 1, 1)
             else
-                GameTooltip:AddLine("Nur der Gruppenführer kann den Run starten", 1, 0.5, 0.5, 1)
+                GameTooltip:AddLine(TDT_L("TOOLTIP_ONLY_LEADER"), 1, 0.5, 0.5, 1)
             end
         end
         GameTooltip:Show()
@@ -379,8 +396,8 @@ function TurtleDungeonTimer:createHeader()
     -- Tooltip
     historyBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Run-Historie", 1, 0.82, 0)
-        GameTooltip:AddLine("Zeigt vergangene Runs und Bestzeiten", 1, 1, 1, 1)
+        GameTooltip:SetText(TDT_L("TOOLTIP_RUN_HISTORY"), 1, 0.82, 0)
+        GameTooltip:AddLine(TDT_L("TOOLTIP_RUN_HISTORY_DESC"), 1, 1, 1, 1)
         GameTooltip:Show()
     end)
     historyBtn:SetScript("OnLeave", function()
@@ -420,6 +437,31 @@ function TurtleDungeonTimer:createTimerRow()
     deathText:SetText("0")
     deathText:SetJustifyH("RIGHT")
     self.frame.deathText = deathText
+    
+    -- World Buffs indicator (small text left of death counter)
+    local worldBuffsText = self.frame:CreateFontString(nil, "OVERLAY")
+    worldBuffsText:SetPoint("RIGHT", deathText, "LEFT", -8, 0)
+    worldBuffsText:SetFont("Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    worldBuffsText:SetTextColor(0.2, 1, 0.2)  -- Light green
+    worldBuffsText:SetText("")
+    worldBuffsText:SetJustifyH("RIGHT")
+    worldBuffsText:Hide()  -- Hidden by default
+    self.frame.worldBuffsText = worldBuffsText
+    
+    -- Create invisible frame for tooltip hover
+    local worldBuffsHover = CreateFrame("Frame", nil, self.frame)
+    worldBuffsHover:SetPoint("RIGHT", deathText, "LEFT", -8, 0)
+    worldBuffsHover:SetWidth(60)
+    worldBuffsHover:SetHeight(15)
+    worldBuffsHover:EnableMouse(true)
+    worldBuffsHover:SetScript("OnEnter", function()
+        -- Tooltip disabled for now
+    end)
+    worldBuffsHover:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    worldBuffsHover:Hide()  -- Hidden by default
+    self.frame.worldBuffsHover = worldBuffsHover
 end
 
 -- ============================================================================
@@ -779,6 +821,45 @@ function TurtleDungeonTimer:updateDeathCount()
     if not self.frame or not self.frame.deathText then return end
 
     self.frame.deathText:SetText("" .. self.deathCount)
+    
+    -- Update World Buffs indicator
+    self:updateWorldBuffsIndicator()
+end
+
+function TurtleDungeonTimer:updateWorldBuffsIndicator()
+    if not self.frame or not self.frame.worldBuffsText or not self.frame.worldBuffsHover then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug WB Indicator] Frame or elements not found", 1, 0, 0)
+        end
+        return
+    end
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug WB Indicator] hasWorldBuffs: " .. tostring(self.hasWorldBuffs) .. ", runWithWorldBuffs: " .. tostring(self.runWithWorldBuffs) .. ", players: " .. tostring(self.worldBuffPlayers and next(self.worldBuffPlayers) and "yes" or "no"), 1, 1, 0)
+    end
+    
+    -- Show indicator if:
+    -- 1. Currently has world buffs (hasWorldBuffs AND players exist) OR
+    -- 2. Run is active and permanently marked with WBs (runWithWorldBuffs)
+    local shouldShow = (self.hasWorldBuffs and self.worldBuffPlayers and next(self.worldBuffPlayers)) or
+                       (self.isRunning and self.runWithWorldBuffs)
+    
+    if shouldShow then
+        self.frame.worldBuffsText:SetText(TDT_L("UI_WORLDBUFFS_DETECTED"))
+        self.frame.worldBuffsText:Show()
+        self.frame.worldBuffsHover:Show()
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug WB Indicator] Showing indicator", 0, 1, 0)
+        end
+    else
+        self.frame.worldBuffsText:Hide()
+        self.frame.worldBuffsHover:Hide()
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug WB Indicator] Hiding indicator", 1, 0.5, 0)
+        end
+    end
 end
 
 function TurtleDungeonTimer:updateDungeonName()
@@ -790,7 +871,7 @@ function TurtleDungeonTimer:updateDungeonName()
             self.frame.dungeonNameText:SetText(dungeonData.name)
         end
     else
-        self.frame.dungeonNameText:SetText("Select Dungeon...")
+        self.frame.dungeonNameText:SetText(TDT_L("UI_LEADER_SELECT_DUNGEON"))
     end
 end
 
@@ -806,6 +887,37 @@ function TurtleDungeonTimer:updateStartPauseButton()
     else
         -- Show play icon
         self.frame.startButton.icon:SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+    end
+end
+
+function TurtleDungeonTimer:updateStartButton()
+    if not self.frame or not self.frame.startBtn then return end
+
+    -- Check if player is group leader
+    local isLeader = self:isGroupLeader()
+    
+    -- Show abort button if timer is running OR preparation is complete
+    local shouldShowAbort = self.isRunning or 
+                           (self.preparationState == "RESETTING" or 
+                            self.preparationState == "READY" or 
+                            self.preparationState == "COUNTDOWN")
+
+    if shouldShowAbort then
+        -- Show abort button
+        self.frame.startBtn.text:SetText("Abort")
+        if isLeader then
+            self.frame.startBtn:SetBackdropColor(0.8, 0.4, 0.1, 1)  -- Orange for abort (leader)
+        else
+            self.frame.startBtn:SetBackdropColor(0.4, 0.4, 0.4, 1)  -- Gray for abort (member)
+        end
+    else
+        -- Show start button
+        self.frame.startBtn.text:SetText("Start")
+        if isLeader then
+            self.frame.startBtn:SetBackdropColor(0.8, 0.1, 0.1, 1)  -- Red for start (leader)
+        else
+            self.frame.startBtn:SetBackdropColor(0.4, 0.4, 0.4, 1)  -- Gray for start (member)
+        end
     end
 end
 
@@ -1345,7 +1457,8 @@ function TurtleDungeonTimer:updateBestTimeDisplay()
 end
 
 function TurtleDungeonTimer:updatePrepareButtonState()
-    -- No separate prepare button - integrated into start button
+    -- Update start button when group composition changes
+    self:updateStartButton()
 end
 
 function TurtleDungeonTimer:toggleMinimized()

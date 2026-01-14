@@ -29,7 +29,7 @@ function TDTTrashScanner:scanCurrentTarget()
     
     -- Check if it's a player (we don't want to scan players)
     if UnitIsPlayer("target") then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Target ist ein Spieler, übersprungen.", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_SCANNER_TARGET_PLAYER"), 1, 0.5, 0)
         return false
     end
     
@@ -37,7 +37,7 @@ function TDTTrashScanner:scanCurrentTarget()
     local timer = TurtleDungeonTimer:getInstance()
     local currentDungeon = timer.selectedDungeon
     if not currentDungeon then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Kein Dungeon ausgewählt! Wähle zuerst einen Dungeon aus.", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_SCANNER_NO_DUNGEON"), 1, 0.5, 0)
         return false
     end
     
@@ -60,7 +60,7 @@ function TDTTrashScanner:scanCurrentTarget()
         existingMob.count = (existingMob.count or 1) + 1
         existingMob.level = targetLevel
         existingMob.classification = targetClassification
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r Count erhöht: |cffffffff" .. targetName .. "|r - HP: " .. targetMaxHP .. " (Count: " .. existingMob.count .. ")", 0, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_SCANNER_COUNT_INCREASED"), targetName, targetMaxHP, existingMob.count), 0, 1, 0)
     else
         -- Add new entry (different name OR different HP)
         local mobData = {
@@ -85,7 +85,7 @@ function TDTTrashScanner:clearCurrentDungeon()
     local timer = TurtleDungeonTimer:getInstance()
     local currentDungeon = timer.selectedDungeon
     if not currentDungeon then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Kein Dungeon ausgewählt!", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_SCANNER_NO_DUNGEON"), 1, 0.5, 0)
         return
     end
     
@@ -110,7 +110,7 @@ function TDTTrashScanner:clearAllData()
     end
     
     TurtleDungeonTimerDB.scannedTrash = {}
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r ALLE Daten gelöscht! (" .. totalDungeons .. " Dungeons, " .. totalMobs .. " Mobs)", 1, 0, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_SCANNER_ALL_DELETED"), totalDungeons, totalMobs), 1, 0, 0)
 end
 
 function TDTTrashScanner:exportToChat()
@@ -211,7 +211,7 @@ function TDTTrashScanner:showStats()
             end
             totalCount = totalCount + dungeonCount
             
-            DEFAULT_CHAT_FRAME:AddMessage("|cffffffff" .. dungeon .. "|r: " .. mobCount .. " verschiedene Mobs, " .. dungeonCount .. " gesamt gezählt", 1, 1, 1)
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(TDT_L("TRASH_SCANNER_DUNGEON_INFO"), dungeon, mobCount, dungeonCount), 1, 1, 1)
         end
     end
     
@@ -219,7 +219,7 @@ function TDTTrashScanner:showStats()
         DEFAULT_CHAT_FRAME:AddMessage("|cffff8800Keine Daten gespeichert.", 1, 0.8, 0)
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff========================================", 0, 1, 1)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ffffGesamt: " .. dungeonCount .. " Dungeons, " .. totalMobs .. " verschiedene, " .. totalCount .. " gezählt", 0, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff" .. string.format(TDT_L("TRASH_SCANNER_TOTAL_INFO"), dungeonCount, totalMobs, totalCount), 0, 1, 1)
     end
     
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff========================================", 0, 1, 1)
@@ -342,7 +342,7 @@ function TDTTrashScanner:refreshListWindow()
     local timer = TurtleDungeonTimer:getInstance()
     local currentDungeon = timer.selectedDungeon
     if not currentDungeon then
-        self.listFrame.dungeonLabel:SetText("Kein Dungeon ausgewählt")
+        self.listFrame.dungeonLabel:SetText(TDT_L("UI_NO_DUNGEON_SELECTED"))
         return
     end
     
@@ -406,7 +406,7 @@ function TDTTrashScanner:refreshListWindow()
                 for idx, m in ipairs(TurtleDungeonTimerDB.scannedTrash[currentDungeon]) do
                     if m.name == mobName and m.hp == mobHP then
                         table.remove(TurtleDungeonTimerDB.scannedTrash[currentDungeon], idx)
-                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Gelöscht: " .. mobName .. " (HP: " .. mobHP .. ")", 1, 0, 0)
+                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_SCANNER_DELETED_MOB"), mobName, mobHP), 1, 0, 0)
                         break
                     end
                 end
@@ -435,7 +435,7 @@ function TDTTrashScanner:refreshListWindow()
                     for idx, m in ipairs(TurtleDungeonTimerDB.scannedTrash[currentDungeon]) do
                         if m.name == mobName and m.hp == mobHP then
                             table.remove(TurtleDungeonTimerDB.scannedTrash[currentDungeon], idx)
-                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Gelöscht: " .. mobName .. " (Count war 1)", 1, 0, 0)
+                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_SCANNER_DELETED_MOB_COUNT"), mobName), 1, 0, 0)
                             break
                         end
                     end

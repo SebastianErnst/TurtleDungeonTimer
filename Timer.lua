@@ -42,6 +42,7 @@ function TurtleDungeonTimer:start()
         self.startTime = GetTime()
         self.killTimes = {}
         self.deathCount = 0
+        self.runCompleted = false  -- Reset completion flag for new run
         
         -- Generate UUID for this run
         self.currentRunUUID = self:generateUUID()
@@ -74,6 +75,7 @@ function TurtleDungeonTimer:start()
     
     -- Reset UI
     self:resetUI()
+    self:updateStartButton()  -- Update button to show "Abort"
     
     -- Minimize the frame
     if not self.minimized then
@@ -163,7 +165,7 @@ function TurtleDungeonTimer:pause()
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer pausiert!", 1, 1, 0)
     
     -- Update button text
-    self:updateStartPauseButton()
+    self:updateStartButton()
 end
 
 function TurtleDungeonTimer:reset()
@@ -222,7 +224,7 @@ function TurtleDungeonTimer:showResetInitiateConfirmation()
     local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     message:SetPoint("TOP", title, "BOTTOM", 0, -15)
     message:SetWidth(300)
-    message:SetText("Möchtest du eine Reset-Abstimmung\nin der Gruppe starten?")
+    message:SetText(TDT_L("UI_RESET_VOTE_QUESTION"))
     message:SetJustifyH("CENTER")
     
     -- Yes Button
@@ -230,7 +232,7 @@ function TurtleDungeonTimer:showResetInitiateConfirmation()
     yesButton:SetWidth(100)
     yesButton:SetHeight(30)
     yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
-    yesButton:SetText("Ja")
+    yesButton:SetText(TDT_L("YES"))
     yesButton:SetScript("OnClick", function()
         dialog:Hide()
         -- Start voting process (this also acts as addon check)
@@ -242,7 +244,7 @@ function TurtleDungeonTimer:showResetInitiateConfirmation()
     noButton:SetWidth(100)
     noButton:SetHeight(30)
     noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
-    noButton:SetText("Nein")
+    noButton:SetText(TDT_L("no"))
     noButton:SetScript("OnClick", function()
         dialog:Hide()
     end)
@@ -257,9 +259,10 @@ function TurtleDungeonTimer:performResetDirect()
     self.deathCount = 0
     self.startTime = nil
     self.restoredElapsedTime = nil
-    self.hasWorldBuffs = false
-    self.hasCheckedWorldBuffs = false
-    self.worldBuffPlayers = {}
+    -- Reset run-specific World Buff flags and lists
+    self.runWithWorldBuffs = nil
+    self.runWorldBuffPlayers = {}
+    -- hasWorldBuffs and worldBuffPlayers are managed by continuous scanning
     
     -- Clear Run ID
     self:clearRunId()
@@ -271,8 +274,7 @@ function TurtleDungeonTimer:performResetDirect()
         end
     end
     
-    -- Stop world buff scanning
-    self:stopWorldBuffScanning()
+    -- DON'T stop world buff scanning - it runs continuously now
     
     -- Reset trash counter
     TDTTrashCounter:stopDungeon()
@@ -283,6 +285,9 @@ function TurtleDungeonTimer:performResetDirect()
     -- Reset UI
     self:resetUI()
     
+    -- Explicitly update World Buffs indicator after reset
+    self:updateWorldBuffsIndicator()
+    
     -- Enable dungeon selector again
     self:setDungeonSelectorEnabled(true)
     
@@ -290,7 +295,7 @@ function TurtleDungeonTimer:performResetDirect()
     self:updateStartPauseButton()
     
     -- Show success message
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer wurde zurückgesetzt", 1, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("TIMER_RESET"), 1, 1, 0)
 end
 
 function TurtleDungeonTimer:performResetSilent()
@@ -305,13 +310,13 @@ function TurtleDungeonTimer:performResetSilent()
         end
     end
     
-    -- Stop world buff scanning
-    self:stopWorldBuffScanning()
+    -- DON'T stop world buff scanning - it runs continuously now
     self.deathCount = 0
     self.startTime = nil
-    self.hasWorldBuffs = false
-    self.hasCheckedWorldBuffs = false
-    self.worldBuffPlayers = {}
+    -- Reset run-specific World Buff flags and lists
+    self.runWithWorldBuffs = nil
+    self.runWorldBuffPlayers = {}
+    -- hasWorldBuffs and worldBuffPlayers are managed by continuous scanning
     
     -- Clear Run ID
     self:clearRunId()
@@ -484,6 +489,7 @@ function TurtleDungeonTimer:updateTimer()
     
     if elapsed > 0 and self.frame.timeText then
         self.frame.timeText:SetText(self:formatTime(elapsed))
+        self:updateStartButton()  -- Update button text
         
         -- Compare with best time
         local bestTime = self:getBestTime()

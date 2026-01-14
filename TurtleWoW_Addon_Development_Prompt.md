@@ -487,6 +487,126 @@ TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibil
 - Format: Major.Minor (e.g., "1.0", "1.1", "2.0")
 - All players need same major version for sync to work
 
+### Localization System (TurtleDungeonTimer Specific)
+
+**⚠️ CRITICAL:** The addon uses a comprehensive localization system for multi-language support.
+
+**File Structure:**
+- **Localization.lua** - Loaded after Core.lua, before Data.lua in .toc
+- Contains all translation keys for English (enUS) and German (deDE)
+- Provides helper functions for easy translation usage
+
+**Language Detection:**
+```lua
+-- Automatic detection via GetLocale()
+local clientLocale = GetLocale() or "enUS"
+
+-- Force specific language (override auto-detection)
+TurtleDungeonTimer.forceLanguage = "enUS"  -- Set to nil for auto-detection
+
+-- Locale mapping
+local localeMapping = {
+    ["enUS"] = "enUS", ["enGB"] = "enUS",
+    ["deDE"] = "deDE", ["frFR"] = "frFR",
+    ["esES"] = "esES", ["ruRU"] = "ruRU",
+    ["zhCN"] = "zhCN", ["zhTW"] = "zhTW"
+}
+```
+
+**Translation System:**
+```lua
+-- Translation tables structure
+translations.enUS = {
+    ["PREP_ONLY_LEADER"] = "Only the group leader can prepare the run!",
+    ["UI_CANCEL_BUTTON"] = "Cancel",
+    -- ... 80+ keys covering all features
+}
+
+translations.deDE = {
+    ["PREP_ONLY_LEADER"] = "Nur der Gruppenführer kann den Run vorbereiten!",
+    ["UI_CANCEL_BUTTON"] = "Abbrechen",
+    -- ... German translations
+}
+
+-- Metatable with automatic fallback chain:
+-- currentLanguage → enUS (English) → key itself
+setmetatable(TurtleDungeonTimer.L, {
+    __index = function(t, key)
+        local lang = translations[currentLanguage]
+        if lang and lang[key] then return lang[key] end
+        if translations.enUS[key] then return translations.enUS[key] end
+        return key
+    end
+})
+```
+
+**Helper Functions:**
+
+1. **TDT_L(key)** - Get translated text (without formatting)
+   ```lua
+   -- Simple translation
+   local text = TDT_L("UI_CANCEL_BUTTON")  -- "Cancel" or "Abbrechen"
+   
+   -- With string.format for parameters
+   local msg = string.format(TDT_L("SYNC_DATA_FROM"), playerName, dungeonName)
+   -- "Run data synchronized from %s: %s" → "Run data synchronized from Player: Dungeon"
+   ```
+
+2. **TDT_Print(key, color, ...)** - Print colored localized message to chat (with formatting)
+   ```lua
+   -- Print with color (no parameters)
+   TDT_Print("PREP_NO_DUNGEON", "error")
+   -- Output: [Turtle Dungeon Timer] No dungeon selected!  (in red)
+   
+   -- Available colors:
+   -- "error" (red), "warning" (orange), "success" (green), "info" (cyan), "normal" (white)
+   
+   -- With parameters (TDT_Print handles string.format internally)
+   TDT_Print("SYNC_DATA_FROM", "success", playerName, dungeonName)
+   ```
+
+**Usage in Code:**
+
+```lua
+-- ❌ WRONG - Hardcoded text
+title:SetText("Run vorbereiten - Dungeon wählen")
+DEFAULT_CHAT_FRAME:AddMessage("Kein Dungeon ausgewählt!", 1, 0, 0)
+
+-- ✅ CORRECT - Using localization
+title:SetText(TDT_L("UI_PREPARE_RUN_TITLE"))
+TDT_Print("PREP_NO_DUNGEON", "error")
+
+-- With formatting
+local message = string.format(TDT_L("UI_RESET_VOTE_MESSAGE"), initiatorName)
+message:SetText(message)
+```
+
+**Adding New Languages:**
+
+1. Copy the `translations.enUS` table structure
+2. Add new language code (e.g., `translations.frFR = {}`)
+3. Translate all 80+ keys
+4. Test with `TurtleDungeonTimer.forceLanguage = "frFR"`
+
+**Translation Key Categories:**
+- `PREP_*` - Preparation system messages
+- `READY_CHECK_*` - Ready check UI/messages
+- `WORLD_BUFFS_*` - World buff detection
+- `SYNC_*` - Synchronization messages
+- `TRASH_*` - Trash scanner messages
+- `BOSS_*` - Boss kill messages
+- `EXPORT_*` - Export system messages
+- `UI_*` - UI element text (buttons, titles, dialogs)
+- `TOOLTIP_*` - Tooltip text
+- `DEBUG_*` - Debug messages (keep in English)
+
+**Important Notes:**
+- All chat messages should use `TDT_Print()` for consistency
+- All UI text (SetText) should use `TDT_L()`
+- **When adding new UI text or chat messages:** ALWAYS add the translation key to both `translations.enUS` AND `translations.deDE` in Localization.lua
+- Debug messages kept in English for consistency across languages
+- Fallback chain ensures addon never shows missing translations
+
 ---
 
 ## Events Reference

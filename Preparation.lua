@@ -18,7 +18,7 @@ TurtleDungeonTimer.firstZoneEnter = nil
 function TurtleDungeonTimer:startPreparation()
     -- Check if player is group leader
     if not self:isGroupLeader() then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Nur der Gruppenführer kann den Run vorbereiten!", 1, 0, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_PREPARE"), 1, 0, 0)
         return
     end
     
@@ -53,7 +53,7 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     -- Title
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", dialog, "TOP", 0, -20)
-    title:SetText("Run vorbereiten - Dungeon wählen")
+    title:SetText(TDT_L("UI_PREPARE_RUN_TITLE"))
     title:SetTextColor(1, 0.82, 0)
     
     -- Create scroll frame for dungeon list
@@ -81,7 +81,7 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     
     -- Build dungeon list
     local dungeonList = {}
-    for dungeonName, dungeonData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
+    for dungeonName, dungeonData in pairs(self.DUNGEON_DATA) do
         table.insert(dungeonList, {
             name = dungeonName,
             displayName = dungeonData.name or dungeonName
@@ -139,7 +139,7 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     cancelBtn:SetWidth(100)
     cancelBtn:SetHeight(30)
     cancelBtn:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
-    cancelBtn:SetText("Abbrechen")
+    cancelBtn:SetText(TDT_L("UI_CANCEL_BUTTON"))
     cancelBtn:SetScript("OnClick", function()
         dialog:Hide()
     end)
@@ -166,13 +166,150 @@ function TurtleDungeonTimer:onPreparationDungeonSelected(dungeonName)
         DEFAULT_CHAT_FRAME:AddMessage("[Debug] Stored pending dungeon selection: " .. tostring(dungeonName), 0, 1, 1)
     end
     
-    -- Now start the actual preparation checks
-    self:beginPreparationChecks()
+    -- Always show World Buff confirmation dialog (even if no buffs detected)
+    -- This allows players to buff up after selecting "With World Buffs"
+    local foundBuffs = self:scanGroupForWorldBuffs()
+    self:showWorldBuffConfirmationDialog(foundBuffs)
+end
+
+function TurtleDungeonTimer:showWorldBuffConfirmationDialog(foundBuffs)
+    -- Create confirmation dialog
+    if self.worldBuffConfirmDialog then
+        self.worldBuffConfirmDialog:Hide()
+        self.worldBuffConfirmDialog = nil
+    end
+    
+    local dialog = CreateFrame("Frame", nil, UIParent)
+    dialog:SetWidth(350)
+    dialog:SetHeight(500)
+    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+    dialog:SetBackdropColor(0, 0, 0, 0.95)
+    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+    dialog:EnableMouse(true)
+    dialog:SetMovable(true)
+    dialog:RegisterForDrag("LeftButton")
+    dialog:SetScript("OnDragStart", function()
+        this:StartMoving()
+    end)
+    dialog:SetScript("OnDragStop", function()
+        this:StopMovingOrSizing()
+    end)
+    self.worldBuffConfirmDialog = dialog
+    
+    -- Title (was question before)
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", dialog, "TOP", 0, -30)
+    title:SetText(TDT_L("UI_WORLDBUFF_CONFIRM_QUESTION"))
+    title:SetTextColor(1, 0.82, 0)
+    
+    local yOffset = -60
+    
+    -- Only show "Players with World Buffs" section if buffs are found
+    if foundBuffs and next(foundBuffs) then
+        local playersTitle = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        playersTitle:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
+        playersTitle:SetText(TDT_L("UI_WORLDBUFF_PLAYERS_TITLE"))
+        playersTitle:SetTextColor(0.2, 1, 0.2)
+        
+        yOffset = yOffset - 20
+        for playerName, buffName in pairs(foundBuffs) do
+            local playerText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            playerText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 30, yOffset)
+            playerText:SetText("  " .. playerName .. ": " .. buffName)
+            playerText:SetTextColor(1, 1, 0)
+            yOffset = yOffset - 15
+        end
+        yOffset = yOffset - 10
+    end
+    
+    -- World Buffs list section
+    local buffListTitle = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    buffListTitle:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
+    buffListTitle:SetText(TDT_L("UI_WORLDBUFF_LIST_TITLE"))
+    buffListTitle:SetTextColor(0.8, 0.8, 0.8)
+    
+    yOffset = yOffset - 20
+    -- Get list of tracked buffs from WorldBuffs.lua
+    local trackedBuffs = {
+        "Rallying Cry of the Dragonslayer",
+        "Spirit of Zandalar",
+        "Warchief's Blessing",
+        "Songflower Serenade",
+        "Fengus' Ferocity",
+        "Mol'dar's Moxie",
+        "Slip'kik's Savvy"
+    }
+    
+    for _, buffName in ipairs(trackedBuffs) do
+        local buffText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        buffText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 30, yOffset)
+        buffText:SetText("  • " .. buffName)
+        buffText:SetTextColor(0.7, 0.7, 0.7)
+        yOffset = yOffset - 15
+    end
+    
+    -- Add tracking info section
+    yOffset = yOffset - 10
+    local infoText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    infoText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
+    infoText:SetWidth(310)
+    infoText:SetText(TDT_L("UI_WORLDBUFF_TRACKING_INFO"))
+    infoText:SetTextColor(1, 1, 0.5)
+    infoText:SetJustifyH("LEFT")
+    -- Set a reasonable height estimate instead of using GetStringHeight()
+    infoText:SetHeight(40)
+    yOffset = yOffset - 50
+    
+    -- Add removal warning section
+    local removalText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    removalText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
+    removalText:SetWidth(310)
+    removalText:SetText(TDT_L("UI_WORLDBUFF_REMOVAL_INFO"))
+    removalText:SetTextColor(1, 0.5, 0.5)
+    removalText:SetJustifyH("LEFT")
+    removalText:SetHeight(30)
+    yOffset = yOffset - 40
+    
+    -- With World Buffs button (green)
+    local withBtn = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    withBtn:SetWidth(140)
+    withBtn:SetHeight(30)
+    withBtn:SetPoint("BOTTOM", dialog, "BOTTOM", -75, 20)
+    withBtn:SetText(TDT_L("UI_WITH_WORLDBUFFS"))
+    withBtn:SetScript("OnClick", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        timer.runWithWorldBuffs = true
+        dialog:Hide()
+        timer:beginPreparationChecks()
+    end)
+    
+    -- Without World Buffs button (red)
+    local withoutBtn = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    withoutBtn:SetWidth(140)
+    withoutBtn:SetHeight(30)
+    withoutBtn:SetPoint("BOTTOM", dialog, "BOTTOM", 75, 20)
+    withoutBtn:SetText(TDT_L("UI_WITHOUT_WORLDBUFFS"))
+    withoutBtn:SetScript("OnClick", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        timer.runWithWorldBuffs = false
+        dialog:Hide()
+        timer:beginPreparationChecks()
+    end)
+    
+    dialog:Show()
 end
 
 function TurtleDungeonTimer:beginPreparationChecks()
-    if not self.selectedDungeon then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Kein Dungeon ausgewählt!", 1, 0, 0)
+    if not self.pendingDungeonSelection then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_NO_DUNGEON_SELECTED"), 1, 0, 0)
         return
     end
     
@@ -181,7 +318,11 @@ function TurtleDungeonTimer:beginPreparationChecks()
     self.countdownTriggered = false
     self.firstZoneEnter = nil
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Starte Run-Vorbereitung für " .. self.selectedDungeon .. "...", 0, 1, 0)
+    -- Get display name for the pending dungeon
+    local dungeonData = self.DUNGEON_DATA[self.pendingDungeonSelection]
+    local dungeonDisplayName = dungeonData and dungeonData.name or self.pendingDungeonSelection
+    
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. string.format(TDT_L("PREP_STARTING_FOR"), dungeonDisplayName), 0, 1, 0)
     
     -- Request addon check from all group members
     self:broadcastPrepareStart()
@@ -300,7 +441,7 @@ function TurtleDungeonTimer:checkVersionMatch()
 end
 
 function TurtleDungeonTimer:executeReset()
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Setze Instanz zurück...", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RESETTING_INSTANCE_MSG"), 0, 1, 0)
     
     -- Listen for system messages
     if not self.resetCheckFrame then
@@ -313,7 +454,7 @@ function TurtleDungeonTimer:executeReset()
     
     -- ⚠️ TESTING MODE - Skip actual reset
     -- ResetInstances()
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[TESTING]|r Reset übersprungen (5/Stunde Limit)", 1, 0.6, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[TESTING]|r " .. TDT_L("PREP_RESET_SKIPPED_LIMIT"), 1, 0.6, 0)
     
     -- Wait a moment for system message (or just simulate success)
     self:scheduleTimer(function()
@@ -336,10 +477,13 @@ function TurtleDungeonTimer:onResetSystemMessage(msg)
 end
 
 function TurtleDungeonTimer:onResetSuccess()
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r Instanz wurde zurückgesetzt", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r " .. TDT_L("PREP_INSTANCE_RESET_SUCCESS"), 0, 1, 0)
     
     self.preparationState = "READY"
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Run bereit! Ihr könnt jetzt die Instanz betreten.", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
+    
+    -- Update button to show "Abort" since preparation is now ready
+    self:updateStartButton()
     
     -- Broadcast ready state to all
     self:sendSyncMessage("PREPARE_READY")
@@ -376,11 +520,18 @@ function TurtleDungeonTimer:startReadyCheck()
     -- Ensure dungeonName is never nil
     dungeonName = dungeonName or ""
     
+    -- Add World Buff info to sync message (format: "dungeonName;wbFlag")
+    local wbFlag = "0" -- Default: no World Buff info
+    if self.runWithWorldBuffs ~= nil then
+        wbFlag = self.runWithWorldBuffs and "1" or "2" -- 1 = with WBs, 2 = without WBs
+    end
+    local syncData = dungeonName .. ";" .. wbFlag
+    
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Sending READY_CHECK_START with dungeonName: " .. tostring(dungeonName), 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Sending READY_CHECK_START with dungeonName: " .. tostring(dungeonName) .. " and WB flag: " .. wbFlag, 1, 1, 0)
     end
     
-    self:sendSyncMessage("READY_CHECK_START", dungeonName)
+    self:sendSyncMessage("READY_CHECK_START", syncData)
     
     -- Auto-respond for self (leader) - leader is always ready
     self.readyCheckResponses[UnitName("player")] = true
@@ -410,7 +561,7 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName)
     -- Create custom ready check frame
     local frame = CreateFrame("Frame", "TDTReadyCheckFrame", UIParent)
     frame:SetWidth(400)
-    frame:SetHeight(200)
+    frame:SetHeight(250) -- Increased height for World Buff info
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetFrameStrata("DIALOG")
     frame:SetBackdrop({
@@ -427,7 +578,7 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName)
     title:SetPoint("TOP", frame, "TOP", 0, -20)
     title:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
     title:SetTextColor(1, 1, 0)
-    title:SetText("Ready Check")
+    title:SetText(TDT_L("UI_READY_CHECK_TITLE"))
     
     -- Question text with dungeon name
     local text = frame:CreateFontString(nil, "OVERLAY")
@@ -436,24 +587,44 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName)
     text:SetTextColor(1, 1, 1)
     
     -- Use provided dungeonName parameter (from leader) or fallback to own selection
-    local dungeonText = "Bist du bereit für den Dungeon-Run?"
+    local dungeonText = TDT_L("UI_READY_CHECK_QUESTION")
     if dungeonName and dungeonName ~= "" then
         -- Use dungeon name from leader's sync message
-        dungeonText = "Dungeonrun für " .. dungeonName .. " starten?"
+        dungeonText = string.format(TDT_L("UI_READY_CHECK_DUNGEON"), dungeonName)
     elseif self.selectedDungeon then
         -- Fallback to own selection (shouldn't happen in normal flow)
         local dungeonData = self.DUNGEON_DATA[self.selectedDungeon]
         local dungeonDisplayName = dungeonData and dungeonData.name or self.selectedDungeon
-        dungeonText = "Dungeonrun für " .. dungeonDisplayName .. " starten?"
+        dungeonText = string.format(TDT_L("UI_READY_CHECK_DUNGEON"), dungeonDisplayName)
     end
     text:SetText(dungeonText)
+    
+    -- World Buff Info (if applicable)
+    local wbInfoY = -80 -- Starting Y position for World Buff info
+    if self.runWithWorldBuffs ~= nil then
+        local wbInfo = frame:CreateFontString(nil, "OVERLAY")
+        wbInfo:SetPoint("TOP", frame, "TOP", 0, wbInfoY)
+        wbInfo:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+        wbInfo:SetWidth(360)
+        
+        if self.runWithWorldBuffs then
+            -- Run WITH World Buffs
+            wbInfo:SetTextColor(0, 1, 0) -- Green
+            wbInfo:SetText(TDT_L("READY_CHECK_WITH_WB"))
+        else
+            -- Run WITHOUT World Buffs
+            wbInfo:SetTextColor(1, 0.5, 0) -- Orange
+            local infoText = TDT_L("READY_CHECK_WITHOUT_WB") .. "\n" .. TDT_L("READY_CHECK_WB_REMOVED") .. "\n\n" .. TDT_L("UI_WORLDBUFF_TRACKING_INFO")
+            wbInfo:SetText(infoText)
+        end
+    end
     
     -- Yes button (left of center)
     local yesBtn = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
     yesBtn:SetWidth(120)
     yesBtn:SetHeight(30)
     yesBtn:SetPoint("RIGHT", frame, "BOTTOM", -10, 55)
-    yesBtn:SetText("Ja")
+    yesBtn:SetText(TDT_L("YES"))
     yesBtn:SetScript("OnClick", function()
         local tdt = TurtleDungeonTimer:getInstance()
         
@@ -467,7 +638,7 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName)
     noBtn:SetWidth(120)
     noBtn:SetHeight(30)
     noBtn:SetPoint("LEFT", frame, "BOTTOM", 10, 55)
-    noBtn:SetText("Nein")
+    noBtn:SetText(TDT_L("UI_NO_BUTTON"))
     noBtn:SetScript("OnClick", function()
         TurtleDungeonTimer:getInstance():respondToReadyCheck(false)
         frame:Hide()
@@ -631,6 +802,11 @@ function TurtleDungeonTimer:finishReadyCheck()
     if allReady then
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r Alle sind ready!", 0, 1, 0)
         
+        -- Remove world buffs if "Without World Buffs" was selected
+        if not self.runWithWorldBuffs then
+            self:removeAllWorldBuffs()
+        end
+        
         -- NOW set the dungeon for everyone (leader + all group members)
         if self:isGroupLeader() and self.pendingDungeonSelection then
             local dungeonKey = self.pendingDungeonSelection
@@ -662,7 +838,7 @@ function TurtleDungeonTimer:finishReadyCheck()
         end
         
         -- Reset current run directly and broadcast to group
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Setze aktuellen Run zurück...", 0, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RESET_CURRENT_RUN"), 0, 1, 0)
         
         -- Broadcast reset to all group members
         self:sendSyncMessage("RESET_EXECUTE")
@@ -672,6 +848,10 @@ function TurtleDungeonTimer:finishReadyCheck()
         
         -- Continue with instance reset
         self.preparationState = "RESETTING"
+        
+        -- Update button to show "Abort" now that run is prepared and resetting
+        self:updateStartButton()
+        
         self:executeReset()
     else
         -- Preparation failed
@@ -763,6 +943,9 @@ function TurtleDungeonTimer:startCountdown(triggeredBy)
     self.countdownValue = 10
     self.preparationState = "COUNTDOWN"
     
+    -- Update button to show "Abort" since countdown started
+    self:updateStartButton()
+    
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. triggeredBy .. " hat die Instanz betreten! Countdown startet in 10 Sekunden...", 0, 1, 0)
     
     self:showCountdownFrame()
@@ -797,7 +980,7 @@ function TurtleDungeonTimer:showCountdownFrame()
     title:SetPoint("TOP", frame, "TOP", 0, -20)
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
     title:SetTextColor(1, 1, 1)
-    title:SetText("Run startet in...")
+    title:SetText(TDT_L("UI_COUNTDOWN_TITLE"))
     frame.title = title
     
     self.countdownFrame = frame
@@ -844,12 +1027,12 @@ function TurtleDungeonTimer:updateCountdownTick()
     -- Check if countdown is finished
     if self.countdownValue <= 0 then
         -- After 1 second, finish the countdown (show "LOS!" and start timer)
-        self:scheduleTimer(function()
+        self.countdownTimerId = self:scheduleTimer(function()
             self:finishCountdown()
         end, 1, false)
     else
         -- Schedule next tick
-        self:scheduleTimer(function()
+        self.countdownTimerId = self:scheduleTimer(function()
             self:updateCountdownTick()
         end, 1, false)
     end
@@ -861,7 +1044,7 @@ function TurtleDungeonTimer:finishCountdown()
     
     -- Show GO!
     if self.countdownFrame and self.countdownFrame.number then
-        self.countdownFrame.number:SetText("LOS!")
+        self.countdownFrame.number:SetText(TDT_L("UI_COUNTDOWN_GO"))
         self.countdownFrame.number:SetTextColor(0, 1, 0)
     end
     
@@ -887,6 +1070,24 @@ function TurtleDungeonTimer:finishCountdown()
             DEFAULT_CHAT_FRAME:AddMessage("[Debug] Timer NICHT gestartet - isRunning=" .. tostring(self.isRunning) .. ", Dungeon=" .. tostring(self.selectedDungeon) .. ", Variant=" .. tostring(self.selectedVariant), 1, 0, 0)
         end
     end
+end
+
+function TurtleDungeonTimer:stopCountdown()
+    -- Cancel countdown timer
+    if self.countdownTimerId then
+        self:cancelTimer(self.countdownTimerId)
+        self.countdownTimerId = nil
+    end
+    
+    -- Hide countdown frame
+    if self.countdownFrame then
+        self.countdownFrame:Hide()
+    end
+    
+    -- Reset countdown state
+    self.countdownTriggered = false
+    self.countdownValue = nil
+    self.firstZoneEnter = nil
 end
 
 -- ============================================================================
@@ -978,7 +1179,10 @@ function TurtleDungeonTimer:onSyncPrepareReady(sender)
     self.preparationState = "READY"
     self.countdownTriggered = false
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Run bereit! Ihr könnt jetzt die Instanz betreten.", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
+    
+    -- Update button to show "Abort" since preparation is now ready
+    self:updateStartButton()
     
     -- Register zone change event for countdown
     if not self.prepFrame then
@@ -1008,6 +1212,6 @@ function TurtleDungeonTimer:onSyncDungeonSelected(dungeonId, sender)
         local oldDungeon = self.selectedDungeon and TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon].name or "Kein Dungeon"
         local newDungeon = TurtleDungeonTimer.DUNGEON_DATA[dungeonId] and TurtleDungeonTimer.DUNGEON_DATA[dungeonId].name or "Unbekannt"
         
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. sender .. " hat einen anderen Dungeon ausgewählt: |cffff0000" .. newDungeon .. "|r (du hast: |cff00ff00" .. oldDungeon .. "|r)", 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. string.format(TDT_L("PREP_DUNGEON_CHANGED"), sender, newDungeon, oldDungeon), 1, 1, 0)
     end
 end

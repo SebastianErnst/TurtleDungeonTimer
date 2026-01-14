@@ -192,6 +192,11 @@ function TurtleDungeonTimer:onCombatStart()
 end
 
 function TurtleDungeonTimer:onAllBossesDefeated()
+    -- Prevent double-completion (e.g., from both boss kill and trash completion)
+    if self.runCompleted then
+        return
+    end
+    
     -- Check if trash requirement is also met (if dungeon has trash data)
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon]
     if dungeonData and self.selectedVariant then
@@ -200,13 +205,14 @@ function TurtleDungeonTimer:onAllBossesDefeated()
             if not TDTTrashCounter:isTrashComplete() then
                 -- Bosse sind tot, aber Trash nicht komplett
                 DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Alle Bosse besiegt! Trash noch nicht komplett.", 1, 1, 0)
-                return  -- Timer läuft weiter
+                return  -- Timer continues
             end
         end
     end
     
     -- Alle Bosse + Trash (falls vorhanden) sind komplett
     self.isRunning = false
+    self.runCompleted = true  -- Mark as completed to prevent double-save
     local finalTime = GetTime() - self.startTime
     
     -- Update progress bar (shows 100% or 100% (+x%) if overage)
@@ -253,14 +259,14 @@ function TurtleDungeonTimer:showDungeonSwitchDialog(newDungeonName)
     -- Title
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", dialog, "TOP", 0, -15)
-    title:SetText("Neuer Dungeon erkannt")
+    title:SetText(TDT_L("UI_NEW_DUNGEON_DETECTED"))
     title:SetTextColor(1, 0.82, 0)
     
     -- Message
     local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     message:SetPoint("TOP", title, "BOTTOM", 0, -10)
     message:SetWidth(310)
-    message:SetText("Du betrittst " .. newDungeonName .. ".\n\nAktuellen Run resetten?")
+    message:SetText(string.format(TDT_L("UI_NEW_DUNGEON_MESSAGE"), newDungeonName))
     message:SetJustifyH("CENTER")
     
     -- Yes Button
@@ -268,7 +274,7 @@ function TurtleDungeonTimer:showDungeonSwitchDialog(newDungeonName)
     yesButton:SetWidth(100)
     yesButton:SetHeight(30)
     yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
-    yesButton:SetText("Ja")
+    yesButton:SetText(TDT_L("YES"))
     yesButton:SetScript("OnClick", function()
         dialog:Hide()
         local timer = TurtleDungeonTimer:getInstance()
@@ -278,7 +284,7 @@ function TurtleDungeonTimer:showDungeonSwitchDialog(newDungeonName)
             timer.frame:Show()
             TurtleDungeonTimerDB.visible = true
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. newDungeonName .. " ausgewählt. Timer startet beim ersten Kampf!", 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. string.format(TDT_L("EVENTS_DUNGEON_SELECTED"), newDungeonName), 1, 1, 0)
     end)
     
     -- No Button
@@ -286,7 +292,7 @@ function TurtleDungeonTimer:showDungeonSwitchDialog(newDungeonName)
     noButton:SetWidth(100)
     noButton:SetHeight(30)
     noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
-    noButton:SetText("Nein")
+    noButton:SetText(TDT_L("UI_NO_BUTTON"))
     noButton:SetScript("OnClick", function()
         dialog:Hide()
     end)
@@ -313,13 +319,13 @@ function TurtleDungeonTimer:showExportBeforeResetDialog()
     
     local text = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     text:SetPoint("TOP", dialog, "TOP", 0, -20)
-    text:SetText("Möchtest du deinen Run\nexportieren?")
+    text:SetText(TDT_L("UI_EXPORT_QUESTION"))
     
     local exportButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
     exportButton:SetWidth(120)
     exportButton:SetHeight(25)
     exportButton:SetPoint("BOTTOM", dialog, "BOTTOM", -65, 15)
-    exportButton:SetText("Exportieren")
+    exportButton:SetText(TDT_L("UI_EXPORT_BUTTON"))
     exportButton:SetScript("OnClick", function()
         dialog:Hide()
         TurtleDungeonTimer:getInstance():showExportDialog()
@@ -330,7 +336,7 @@ function TurtleDungeonTimer:showExportBeforeResetDialog()
     skipButton:SetWidth(120)
     skipButton:SetHeight(25)
     skipButton:SetPoint("BOTTOM", dialog, "BOTTOM", 65, 15)
-    skipButton:SetText("Überspringen")
+    skipButton:SetText(TDT_L("UI_SKIP_BUTTON"))
     skipButton:SetScript("OnClick", function()
         dialog:Hide()
         TurtleDungeonTimer:getInstance():performReset()

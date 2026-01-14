@@ -258,7 +258,7 @@ function TDTTrashCounter:checkRunCompletion()
                 DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Alle Bosse UND Trash erledigt - Run abgeschlossen!")
                 timer:onAllBossesDefeated()
             else
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Trash erledigt! Noch " .. (requiredBosses - requiredKills) .. " Bosse übrig.")
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r " .. string.format(TDT_L("TRASH_COUNTER_DONE"), requiredBosses - requiredKills))
             end
         end
     end

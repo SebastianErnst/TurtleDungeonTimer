@@ -187,13 +187,13 @@ function TurtleDungeonTimer:showExportDialog()
     -- Title
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", dialog, "TOP", 0, -15)
-    title:SetText("Export Run Data")
+    title:SetText(TDT_L("UI_EXPORT_TITLE"))
     title:SetTextColor(1, 0.82, 0)
     
     -- Description
     local desc = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     desc:SetPoint("TOP", title, "BOTTOM", 0, -10)
-    desc:SetText("Export string is also printed in chat for easy copying.")
+    desc:SetText(TDT_L("UI_EXPORT_DESCRIPTION"))
     desc:SetTextColor(0, 1, 0)
     
     -- ScrollFrame for export string
@@ -251,7 +251,7 @@ function TurtleDungeonTimer:showExportDialog()
     closeButton:SetWidth(100)
     closeButton:SetHeight(30)
     closeButton:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 15)
-    closeButton:SetText("Close")
+    closeButton:SetText(TDT_L("UI_CLOSE_BUTTON"))
     closeButton:SetScript("OnClick", function()
         dialog:Hide()
     end)

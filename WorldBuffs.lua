@@ -10,16 +10,121 @@ local WORLD_BUFFS = {
     ["Songflower Serenade"] = true,
     ["Fengus' Ferocity"] = true,
     ["Mol'dar's Moxie"] = true,
-    ["Slip'kik's Savvy"] = true
+    ["Slip'kik's Savvy"] = true,
+    ["Righteous Fury"] = true  -- TEST: Remove after testing
 }
-
--- ============================================================================
--- BUFF SCANNING FUNCTIONS
--- ============================================================================
 
 -- Create hidden tooltip for buff scanning
 local scanTooltip = CreateFrame("GameTooltip", "TDTWorldBuffScanTooltip", nil, "GameTooltipTemplate")
 scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+
+-- ============================================================================
+-- BUFF REMOVAL FUNCTIONS
+-- ============================================================================
+
+-- Remove all world buffs from all group members (leader only)
+function TurtleDungeonTimer:removeAllWorldBuffs()
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Requesting world buff removal from all group members", 0, 1, 1)
+    end
+    
+    -- Send sync message to all group members to remove their own buffs
+    if self:isGroupLeader() then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug] Sending REMOVE_WORLD_BUFFS sync message", 0, 1, 1)
+        end
+        
+        self:sendSyncMessage("REMOVE_WORLD_BUFFS")
+        
+        -- Also remove our own buffs
+        self:removeOwnWorldBuffs()
+        
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r World Buff Entfernung an alle Gruppenmitglieder gesendet.", 1, 0.6, 0)
+    else
+        -- Only leaders can initiate group-wide removal
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_REMOVE_WB"), 1, 0, 0)
+    end
+end
+
+-- Remove only our own world buffs (called by sync message)
+function TurtleDungeonTimer:removeOwnWorldBuffs()
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Removing own world buffs", 0, 1, 1)
+    end
+    
+    self:removeWorldBuffsFromUnit("player")
+end
+
+-- Remove world buffs from specific unit
+function TurtleDungeonTimer:removeWorldBuffsFromUnit(unit)
+    local removedCount = 0
+    
+    -- For each world buff name, search through ALL buffs and remove it if found
+    for worldBuffName, _ in pairs(WORLD_BUFFS) do
+        -- Search through all buffs for this specific world buff
+        for buffIndex = 1, 50 do  -- Max 50 buff slots
+            local buffTexture = UnitBuff(unit, buffIndex)
+            if not buffTexture then 
+                break  -- No more buffs
+            end
+            
+            -- Check if this buff matches our target world buff
+            scanTooltip:ClearLines()
+            scanTooltip:SetUnitBuff(unit, buffIndex)
+            local buffName = TDTWorldBuffScanTooltipTextLeft1:GetText()
+            
+            if buffName == worldBuffName then
+                -- Found it! Cancel this buff
+                if unit == "player" then
+                    CancelPlayerBuff(buffIndex)
+                    removedCount = removedCount + 1
+                    if TurtleDungeonTimerDB.debug then
+                        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Removed " .. buffName .. " from player (slot " .. buffIndex .. ")", 0, 1, 1)
+                    end
+                else
+                    if TurtleDungeonTimerDB.debug then
+                        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Cannot remove " .. buffName .. " from " .. UnitName(unit) .. " (not player)", 0, 1, 1)
+                    end
+                end
+                break  -- Exit inner loop, this world buff is handled
+            end
+        end
+    end
+    
+    if removedCount > 0 then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r " .. removedCount .. " World Buffs entfernt.", 1, 0.6, 0)
+    elseif TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] No world buffs found to remove", 0, 1, 1)
+    end
+end
+
+-- Iterator for group members
+function TurtleDungeonTimer:iterateGroupMembers()
+    local members = {"player"}
+    
+    if GetNumRaidMembers() > 0 then
+        for i = 1, GetNumRaidMembers() do
+            local name = GetRaidRosterInfo(i)
+            if name and name ~= UnitName("player") then
+                table.insert(members, "raid" .. i)
+            end
+        end
+    elseif GetNumPartyMembers() > 0 then
+        for i = 1, GetNumPartyMembers() do
+            table.insert(members, "party" .. i)
+        end
+    end
+    
+    local index = 0
+    return function()
+        index = index + 1
+        return members[index]
+    end
+end
+
+-- ============================================================================
+-- BUFF SCANNING FUNCTIONS
+-- ============================================================================
 
 -- Get buff name from tooltip
 local function GetBuffName(unit, buffIndex)
@@ -109,22 +214,56 @@ function TurtleDungeonTimer:markRunWithWorldBuffs()
         self.hasWorldBuffs = true
         self.worldBuffPlayers = foundBuffs
         
-        -- Only log message on first detection
-        if isFirstDetection then
+        -- If a run is active, permanently mark it as "with World Buffs"
+        if self.isRunning and not self.runWithWorldBuffs then
+            self.runWithWorldBuffs = true
+            
             local count = 0
             for _ in pairs(foundBuffs) do
                 count = count + 1
             end
             
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r World Buffs erkannt! Run wird als 'Mit World Buffs' markiert. (" .. count .. " Spieler)", 1, 1, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r World Buffs erkannt! Dieser Run wird dauerhaft als 'Mit World Buffs' markiert. (" .. count .. " Spieler)", 1, 1, 0)
+        end
+        
+        -- Update UI indicator (always, even when not running)
+        self:updateWorldBuffsIndicator()
+        
+        -- Log message on first detection (outside of running)
+        if isFirstDetection and not self.isRunning then
+            local count = 0
+            for _ in pairs(foundBuffs) do
+                count = count + 1
+            end
+            
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r World Buffs erkannt! (" .. count .. " Spieler)", 1, 1, 0)
+        end
+    else
+        -- No buffs found
+        -- If run is active and already marked with World Buffs, keep the marker!
+        if self.isRunning and self.runWithWorldBuffs then
+            -- Keep hasWorldBuffs = true to show indicator during run
+            self.hasWorldBuffs = true
+            self.worldBuffPlayers = {} -- Clear player list but keep indicator
+            self:updateWorldBuffsIndicator() -- Update UI to keep indicator visible
+        else
+            -- Clear state (outside of run or run not marked with WB)
+            if self.hasWorldBuffs then
+                self.hasWorldBuffs = false
+                self.worldBuffPlayers = {}
+                self:updateWorldBuffsIndicator()
+            end
         end
     end
 end
 
--- Start periodic world buff scanning (called when timer starts)
+-- Start periodic world buff scanning (runs continuously)
 function TurtleDungeonTimer:startWorldBuffScanning()
-    self.hasWorldBuffs = false
-    self.worldBuffPlayers = {}
+    -- Don't reset flags if already running
+    if not self.worldBuffScanFrame then
+        self.hasWorldBuffs = false
+        self.worldBuffPlayers = {}
+    end
     
     -- Stop any existing scan
     self:stopWorldBuffScanning()
@@ -137,12 +276,7 @@ function TurtleDungeonTimer:startWorldBuffScanning()
         if elapsed >= 1.0 then  -- Scan every 1 second
             elapsed = 0
             local timer = TurtleDungeonTimer:getInstance()
-            if timer.isRunning then
-                timer:markRunWithWorldBuffs()
-            else
-                -- Stop scanning if timer stopped
-                timer:stopWorldBuffScanning()
-            end
+            timer:markRunWithWorldBuffs()
         end
     end)
 end
