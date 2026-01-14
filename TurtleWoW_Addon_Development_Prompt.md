@@ -456,19 +456,36 @@ end
 
 ### Version Management (TurtleDungeonTimer Specific)
 
-**⚠️ CRITICAL:** When updating the addon version, you MUST update it in TWO places:
+**⚠️ CRITICAL:** When updating the addon version, you MUST update it in TWO places (Single Source of Truth):
 
-1. **TurtleDungeonTimer.toc** - The `## Version:` field
-2. **Preparation.lua** - The `ADDON_VERSION` constant used for version checks
+1. **Core.lua** - The `ADDON_VERSION` constant (full version with -alpha/-beta suffix)
+2. **TurtleDungeonTimer.toc** - The `## Version:` field (must match Core.lua exactly)
 
 ```lua
--- In Preparation.lua
-local ADDON_VERSION = "1.2.3"  -- Must match .toc version!
+-- In Core.lua (lines ~11-14)
+-- ============================================================================
+-- VERSION MANAGEMENT (SINGLE SOURCE OF TRUTH)
+-- ============================================================================
+-- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
+-- When updating version: Change ONLY this constant and the .toc file.
+TurtleDungeonTimer.ADDON_VERSION = "1.0.6-alpha"
+TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 ```
 
-**Why this matters:** The preparation system checks version compatibility between party members. If the .toc version changes but `ADDON_VERSION` in Preparation.lua doesn't, version checks will fail or show incorrect warnings.
+**Why this matters:** 
+- All other files (Sync.lua, Preparation.lua, etc.) reference `self.ADDON_VERSION` or `self.SYNC_VERSION`
+- The sync system checks version compatibility between party members
+- Having a single source of truth prevents version mismatches and sync failures
 
-**When to update:** Every time you increment the version in the .toc file for a release.
+**When to update:** 
+- Every time you increment the version for a release
+- Update BOTH `ADDON_VERSION` in Core.lua AND `## Version:` in .toc file
+- Keep them identical (including -alpha/-beta suffix)
+
+**Protocol Version (`SYNC_VERSION`):**
+- Only change when sync message format changes (breaking compatibility)
+- Format: Major.Minor (e.g., "1.0", "1.1", "2.0")
+- All players need same major version for sync to work
 
 ---
 

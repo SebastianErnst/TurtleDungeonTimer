@@ -1,9 +1,9 @@
 -- ============================================================================
 -- Turtle Dungeon Timer - Group Synchronization
 -- ============================================================================
+-- NOTE: SYNC_VERSION is defined in Core.lua (single source of truth)
 
 TurtleDungeonTimer.SYNC_PREFIX = "TDT_SYNC"
-TurtleDungeonTimer.SYNC_VERSION = "1.0"
 TurtleDungeonTimer.SYNC_INTERVAL = 10  -- Periodic sync interval in seconds (configurable for testing)
 TurtleDungeonTimer.playersWithAddon = {}
 TurtleDungeonTimer.resetVotes = {}
