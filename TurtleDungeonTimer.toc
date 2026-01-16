@@ -2,7 +2,7 @@
 ## Title: Turtle Dungeon Timer
 ## Notes: Advanced dungeon and raid timer with boss tracking, best times, and splits
 ## Author: YourName
-## Version: 1.0.9-alpha
+## Version: 1.0.10-alpha
 ## SavedVariables: TurtleDungeonTimerDB
 
 Core.lua
@@ -14,6 +14,7 @@ Minimap.lua
 Timer.lua
 WorldBuffs.lua
 TrashScanner.lua
+AutoTrashScan.lua
 TrashCounter.lua
 Events.lua
 Sync.lua

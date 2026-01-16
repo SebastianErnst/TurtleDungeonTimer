@@ -202,6 +202,14 @@ function TurtleDungeonTimer:createDebugFrame()
         TDTTrashScanner:showListWindow()
     end)
     
+    createButton("Open Auto Scan Window", function()
+        TDTAutoTrashScan:showListWindow()
+    end)
+    
+    createButton("Toggle Auto Scan", function()
+        TDTAutoTrashScan:toggle()
+    end)
+    
     yOffset = yOffset - 10
     
     -- === GROUP & BUFFS ===

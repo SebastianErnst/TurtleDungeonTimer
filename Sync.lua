@@ -73,6 +73,14 @@ function TurtleDungeonTimer:syncFrameOnEvent()
             instance:onSyncMessage(message, sender, channel)
         end
     elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        -- Check if a run is active - if yes, abort it due to group composition change
+        if instance.isRunning or instance.isCountingDown then
+            -- Send sync message to inform all group members
+            instance:sendSyncMessage("ABORT_GROUP_CHANGE")
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
+            instance:abortRun()
+        end
+        
         instance:checkForAddons()
         -- Delay button update because group status might not be updated immediately
         instance:scheduleTimer(function()
@@ -272,6 +280,8 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
         self:onSyncAbortCancel(sender)
     elseif msgType == "ABORT_EXECUTE" then
         self:onSyncAbortExecute(sender)
+    elseif msgType == "ABORT_GROUP_CHANGE" then
+        self:onSyncAbortGroupChange(sender)
     end
 end
 
@@ -405,6 +415,17 @@ end
 -- ABORT VOTING SYSTEM
 -- ============================================================================
 
+function TurtleDungeonTimer:syncTimerAbort()
+    local addonUserCount = self:getAddonUserCount()
+    if addonUserCount == 0 then
+        -- No other addon users, abort directly
+        self:abortRun()
+        return
+    end
+    
+    self:startAbortVote()
+end
+
 function TurtleDungeonTimer:startAbortVote()
     self:sendSyncMessage("ABORT_REQUEST")
     
@@ -514,6 +535,21 @@ function TurtleDungeonTimer:onSyncAbortExecute(sender)
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Run wurde von der Gruppe abgebrochen", 1, 1, 0)
 end
 
+function TurtleDungeonTimer:onSyncAbortGroupChange(sender)
+    -- Only abort if we're actually running (prevent duplicate aborts)
+    if self.isRunning or self.isCountingDown then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
+        self:abortRun()
+    end
+    
+    self.abortVotes = {}
+    self.abortInitiator = nil
+    
+    if self.abortVoteDialog then
+        self.abortVoteDialog:Hide()
+    end
+end
+
 function TurtleDungeonTimer:showAbortVoteDialog(initiator)
     if self.abortVoteDialog then
         self.abortVoteDialog:Hide()
@@ -621,7 +657,7 @@ function TurtleDungeonTimer:showAbortConfirmationDialog()
     yesButton:SetText(TDT_L("YES"))
     yesButton:SetScript("OnClick", function()
         local self = TurtleDungeonTimer:getInstance()
-        self:startAbortVote()
+        self:syncTimerAbort()
         dialog:Hide()
     end)
     
@@ -643,11 +679,9 @@ function TurtleDungeonTimer:abortRun()
     self.startTime = nil
     self.restoredElapsedTime = nil
     
-    -- Set flag to prevent auto-restart from sync for 5 seconds
+    -- Set flag to prevent auto-restart from sync
+    -- This flag will be cleared when starting a new run manually
     self.runAborted = true
-    self:scheduleTimer(function()
-        self.runAborted = false
-    end, 5, false)
     
     -- Stop countdown if running
     if self.preparationState == "COUNTDOWN" then

@@ -76,6 +76,7 @@ translations.enUS = {
     ["SYNC_COUNTDOWN_INTERRUPTED"] = "Countdown was interrupted - waiting for group data...",
     ["SYNC_GROUP_IN_COUNTDOWN"] = "Group is in countdown - timer will start soon",
     ["SYNC_TIMER_CONTINUED"] = "Timer continued after reload (Offline time: %s)",
+    ["RUN_ABORTED_GROUP_CHANGE"] = "Run aborted! Group composition changed (player joined/left).",
     
     -- Trash Scanner
     ["TRASH_NO_TARGET"] = "No target!",
@@ -231,6 +232,7 @@ translations.deDE = {
     ["SYNC_COUNTDOWN_INTERRUPTED"] = "Countdown wurde unterbrochen - warte auf Gruppendaten...",
     ["SYNC_GROUP_IN_COUNTDOWN"] = "Gruppe ist im Countdown - Timer startet gleich",
     ["SYNC_TIMER_CONTINUED"] = "Timer nach Reload fortgesetzt (Offline Zeit: %s)",
+    ["RUN_ABORTED_GROUP_CHANGE"] = "Run abgebrochen! Gruppenzusammensetzung hat sich geändert (Spieler beigetreten/verlassen).",
     
     -- Trash Scanner
     ["TRASH_NO_TARGET"] = "Kein Target vorhanden!",

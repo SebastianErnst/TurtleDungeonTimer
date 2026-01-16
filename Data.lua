@@ -32,23 +32,65 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             }
         }
     },
-    -- ["Stratholme"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         -- ["Living"] = {
-    --         --     bosses = {"Timmy the Cruel", "Malor the Zealous", "Cannon Master Willey", "Archivist Galford", "Balnazzar"},
-    --         --     optionalBosses = {
-    --         --         ["Hearthsinger Forresten"] = true -- Rare
-    --         --     }
-    --         -- },
-    --         ["Undead"] = {
-    --             bosses = {"Baroness Anastari", "Nerub'enkan", "Maleki the Pallid", "Magistrate Barthilas", "Ramstein the Gorger", "Baron Rivendare"},
-    --             optionalBosses = {                    
-    --                 ["Stonespine"] = true -- Rare
-    --             }
-    --         }
-    --     }
-    -- },
+    ["Stratholme"] = {
+        isDungeon = true,
+        variants = {
+            ["Living"] = {
+                bosses = {"Timmy the Cruel", "Malor the Zealous", "Cannon Master Willey", "Archivist Galford", "Balnazzar"},
+                optionalBosses = {
+                    ["Hearthsinger Forresten"] = true -- Rare
+                }
+            },
+            ["Undead"] = {
+                bosses = {"Baroness Anastari", "Nerub'enkan", "Maleki the Pallid", "Magistrate Barthilas", "Ramstein the Gorger", "Baron Rivendare"},
+                optionalBosses = {                    
+                    ["Stonespine"] = true -- Rare
+                },
+                trashRequiredPercent = 70,
+                totalTrashHP = 1392146,
+                trashMobs = {
+                    {name = "Mangled Cadaver", level = 55, hp = 9151, count = 3},
+                    {name = "Broken Cadaver", level = 55, hp = 1003, count = 4},
+                    {name = "Skeletal Berserker", level = 57, hp = 3344, count = 2},
+                    {name = "Skeletal Guardian", level = 55, hp = 3293, count = 5},
+                    {name = "Ravaged Cadaver", level = 57, hp = 10031, count = 3},
+                    {name = "Skeletal Berserker", level = 56, hp = 3242, count = 4},
+                    {name = "Ravaged Cadaver", level = 56, hp = 9724, count = 1},
+                    {name = "Skeletal Guardian", level = 56, hp = 3401, count = 2},
+                    {name = "Mangled Cadaver", level = 56, hp = 9448, count = 1},
+                    {name = "Crypt Beast", level = 59, hp = 9771, count = 1},
+                    {name = "Wailing Banshee", level = 58, hp = 9474, count = 4},
+                    {name = "Fleshflayer Ghoul", level = 59, hp = 9771, count = 5},
+                    {name = "Ghoul Ravener", level = 58, hp = 9474, count = 12},
+                    {name = "Shrieking Banshee", level = 57, hp = 9187, count = 6},
+                    {name = "Rockwing Gargoyle", level = 57, hp = 9187, count = 3},
+                    {name = "Rockwing Screecher", level = 59, hp = 9771, count = 2},
+                    {name = "Crypt Beast", level = 60, hp = 10072, count = 5},
+                    {name = "Shrieking Banshee", level = 58, hp = 9474, count = 3},
+                    {name = "Rockwing Gargoyle", level = 58, hp = 9474, count = 1},
+                    {name = "Plague Ghoul", level = 58, hp = 9474, count = 5},
+                    {name = "Rockwing Screecher", level = 58, hp = 9474, count = 1},
+                    {name = "Thuzadin Shadowcaster", level = 58, hp = 6633, count = 8},
+                    {name = "Thuzadin Necromancer", level = 60, hp = 7049, count = 11},
+                    {name = "Crypt Crawler", level = 59, hp = 9771, count = 5},
+                    {name = "Thuzadin Acolyte", level = 59, hp = 3257, count = 15},
+                    {name = "Crypt Crawler", level = 58, hp = 9474, count = 2},
+                    {name = "Thuzadin Necromancer", level = 61, hp = 7263, count = 6},
+                    {name = "Plague Ghoul", level = 57, hp = 9187, count = 8},
+                    {name = "Ghoul Ravener", level = 59, hp = 9771, count = 5},
+                    {name = "Fleshflayer Ghoul", level = 60, hp = 10072, count = 5},
+                    {name = "Thuzadin Shadowcaster", level = 59, hp = 6841, count = 6},
+                    {name = "Wailing Banshee", level = 59, hp = 9771, count = 2},
+                    {name = "Venom Belcher", level = 61, hp = 17292, count = 5},
+                    {name = "Bile Spewer", level = 59, hp = 16286, count = 1},
+                    {name = "Venom Belcher", level = 60, hp = 16786, count = 4},
+                    {name = "Bile Spewer", level = 60, hp = 16786, count = 2},
+                    {name = "Mindless Undead", level = 57, hp = 1337, count = 34},
+                    {name = "Black Guard Sentry", level = 58, hp = 7580, count = 5}
+                }
+            }
+        }
+    },
     ["Dire Maul"] = {
         isDungeon = true,
         variants = {

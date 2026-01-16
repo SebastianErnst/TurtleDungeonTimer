@@ -453,7 +453,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    ResetInstances()
+    -- ResetInstances()
     DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[TESTING]|r " .. TDT_L("PREP_RESET_SKIPPED_LIMIT"), 1, 0.6, 0)
     
     -- Wait a moment for system message (or just simulate success)
@@ -937,6 +937,9 @@ function TurtleDungeonTimer:startCountdown(triggeredBy)
     if self.countdownTriggered then
         return
     end
+    
+    -- Clear abort flag when starting countdown
+    self.runAborted = false
     
     self.countdownTriggered = true
     self.firstZoneEnter = triggeredBy

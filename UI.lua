@@ -779,9 +779,9 @@ function TurtleDungeonTimer:updateTimerDisplay()
         timeStr = string.format("%02d:%02d", minutes, seconds)
     elseif table.getn(self.killTimes) > 0 then
         local lastKillTime = self.killTimes[table.getn(self.killTimes)]
-        if lastKillTime then
-            local minutes = math.floor(lastKillTime / 60)
-            local seconds = lastKillTime - (minutes * 60)
+        if lastKillTime and lastKillTime.time then
+            local minutes = math.floor(lastKillTime.time / 60)
+            local seconds = lastKillTime.time - (minutes * 60)
             timeStr = string.format("%02d:%02d", minutes, seconds)
         end
     end

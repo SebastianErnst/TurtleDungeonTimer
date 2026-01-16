@@ -28,6 +28,9 @@ function TurtleDungeonTimer:start()
         self:cancelCountdown()
     end
     
+    -- Clear abort flag when manually starting timer
+    self.runAborted = false
+    
     -- Start timer immediately
     self.isRunning = true
     

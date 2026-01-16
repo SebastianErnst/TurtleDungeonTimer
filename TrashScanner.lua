@@ -444,9 +444,24 @@ function TDTTrashScanner:refreshListWindow()
             TDTTrashScanner:refreshListWindow()
         end)
         
+        -- Increase count button (+)
+        local increaseBtn = CreateFrame("Button", nil, row)
+        increaseBtn:SetWidth(16)
+        increaseBtn:SetHeight(16)
+        increaseBtn:SetPoint("RIGHT", decreaseBtn, "LEFT", -2, 0)
+        increaseBtn:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+        increaseBtn:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
+        increaseBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
+        increaseBtn:SetScript("OnClick", function()
+            -- Increase count
+            mobRef.count = (mobRef.count or 1) + 1
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r Count erhöht: " .. mobName .. " (Count: " .. mobRef.count .. ")", 0, 1, 0)
+            TDTTrashScanner:refreshListWindow()
+        end)
+        
         -- HP
         local hpText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        hpText:SetPoint("RIGHT", decreaseBtn, "LEFT", -4, 0)
+        hpText:SetPoint("RIGHT", increaseBtn, "LEFT", -4, 0)
         hpText:SetWidth(50)
         hpText:SetJustifyH("RIGHT")
         hpText:SetText(mobHP)
