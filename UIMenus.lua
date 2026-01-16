@@ -261,7 +261,8 @@ function TurtleDungeonTimer:showInstanceListDirect(parentBtn, isDungeonFilter)
     local menu = {}
     for instanceName, instanceData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
         if instanceData.isDungeon == isDungeonFilter or instanceData.isRaid == (not isDungeonFilter) then
-            table.insert(menu, {text = instanceName})
+            local displayName = instanceData.displayName or instanceName
+            table.insert(menu, {text = displayName, key = instanceName})
         end
     end
     
@@ -294,13 +295,14 @@ function TurtleDungeonTimer:showInstanceListDirect(parentBtn, isDungeonFilter)
     
     for i = 1, numItems do
         local item = menu[i]
-        local instanceName = item.text
-        local btn = self:CreateTDTButton(scrollChild, instanceName, btnWidth, btnHeight)
+        local displayName = item.text
+        local instanceName = item.key
+        local btn = self:CreateTDTButton(scrollChild, displayName, btnWidth, btnHeight)
         btn:SetPoint("TOP", scrollChild, "TOP", 0, -(i-1) * btnHeight)
         local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         text:SetPoint("LEFT", btn, "LEFT", 5, 0)
         text:SetPoint("RIGHT", btn, "RIGHT", -18, 0)
-        text:SetText(instanceName)
+        text:SetText(displayName)
         text:SetJustifyH("LEFT")
         local variants = TurtleDungeonTimer.DUNGEON_DATA[instanceName].variants
         local variantCount = 0

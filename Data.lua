@@ -34,6 +34,7 @@ TurtleDungeonTimer.DUNGEON_DATA = {
     },
     ["Stratholme"] = {
         isDungeon = true,
+        displayName = "Strath",
         variants = {
             ["Living"] = {
                 bosses = {"Timmy the Cruel", "Malor the Zealous", "Cannon Master Willey", "Archivist Galford", "Balnazzar"},

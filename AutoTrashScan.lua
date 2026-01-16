@@ -1112,9 +1112,10 @@ function TDTAutoTrashScan:showDungeonMenu(button)
     -- Build sorted dungeon list
     local dungeonList = {}
     for dungeonKey, dungeonData in pairs(timer.DUNGEON_DATA) do
+        local displayName = dungeonData.displayName or dungeonKey
         table.insert(dungeonList, {
             key = dungeonKey,
-            name = dungeonData.name or dungeonKey,
+            name = displayName,
             variantCount = 0
         })
     end

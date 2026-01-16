@@ -82,9 +82,17 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     -- Build dungeon list
     local dungeonList = {}
     for dungeonName, dungeonData in pairs(self.DUNGEON_DATA) do
+        local displayName = dungeonData.displayName or dungeonName
+        local variantCount = 0
+        if dungeonData.variants then
+            for _ in pairs(dungeonData.variants) do
+                variantCount = variantCount + 1
+            end
+        end
         table.insert(dungeonList, {
-            name = dungeonName,
-            displayName = dungeonData.name or dungeonName
+            key = dungeonName,
+            displayName = displayName,
+            variantCount = variantCount
         })
     end
     
@@ -120,17 +128,37 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
         btnText:SetText(dungeon.displayName)
         btnText:SetJustifyH("LEFT")
         
+        -- Show arrow if multiple variants
+        if dungeon.variantCount > 1 then
+            local arrow = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            arrow:SetPoint("RIGHT", btn, "RIGHT", -10, 0)
+            arrow:SetText(">")
+        end
+        
         -- Capture dungeon name for closure
-        local dungeonName = dungeon.name
+        local dungeonKey = dungeon.key
+        local variantCount = dungeon.variantCount
         
         btn:SetScript("OnEnter", function()
             this:SetBackdropColor(0.3, 0.3, 0.3, 0.9)
+            -- Show variant submenu if multiple variants
+            if variantCount > 1 then
+                TurtleDungeonTimer:getInstance():showPreparationVariantMenu(this, dungeonKey)
+            end
         end)
         btn:SetScript("OnLeave", function()
             this:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
         end)
         btn:SetScript("OnClick", function()
-            TurtleDungeonTimer:getInstance():onPreparationDungeonSelected(dungeonName)
+            if variantCount == 1 then
+                -- Only one variant, select directly
+                local variants = TurtleDungeonTimer.DUNGEON_DATA[dungeonKey].variants
+                for variantName, _ in pairs(variants) do
+                    TurtleDungeonTimer:getInstance():onPreparationDungeonVariantSelected(dungeonKey, variantName)
+                    break
+                end
+            end
+            -- If multiple variants, submenu is already shown on hover
         end)
     end
     
@@ -147,9 +175,86 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     dialog:Show()
 end
 
-function TurtleDungeonTimer:onPreparationDungeonSelected(dungeonName)
+function TurtleDungeonTimer:showPreparationVariantMenu(parentBtn, dungeonKey)
+    -- Close existing variant menu
+    if self.preparationVariantMenu then
+        self.preparationVariantMenu:Hide()
+        self.preparationVariantMenu = nil
+    end
+    
+    local dungeonData = self.DUNGEON_DATA[dungeonKey]
+    if not dungeonData or not dungeonData.variants then
+        return
+    end
+    
+    -- Build variant list
+    local variantList = {}
+    for variantName, _ in pairs(dungeonData.variants) do
+        table.insert(variantList, variantName)
+    end
+    
+    table.sort(variantList)
+    
+    local numVariants = table.getn(variantList)
+    local btnHeight = 25
+    local menuHeight = numVariants * btnHeight + 8
+    
+    local submenu = CreateFrame("Frame", nil, self.preparationDungeonDialog)
+    submenu:SetWidth(150)
+    submenu:SetHeight(menuHeight)
+    submenu:SetPoint("TOPLEFT", parentBtn, "TOPRIGHT", 5, 0)
+    submenu:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 8,
+        insets = {left = 2, right = 2, top = 2, bottom = 2}
+    })
+    submenu:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    submenu:SetFrameStrata("FULLSCREEN_DIALOG")
+    submenu:Show()
+    
+    self.preparationVariantMenu = submenu
+    
+    -- Create buttons for each variant
+    for i = 1, numVariants do
+        local variantName = variantList[i]
+        
+        local btn = CreateFrame("Button", nil, submenu)
+        btn:SetWidth(140)
+        btn:SetHeight(btnHeight - 2)
+        btn:SetPoint("TOP", submenu, "TOP", 0, -4 - (i-1) * btnHeight)
+        
+        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        text:SetPoint("LEFT", btn, "LEFT", 5, 0)
+        text:SetText(variantName)
+        text:SetJustifyH("LEFT")
+        
+        btn:SetScript("OnEnter", function()
+            this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+            this:SetBackdropColor(0.4, 0.4, 0.4, 0.8)
+        end)
+        
+        btn:SetScript("OnLeave", function()
+            this:SetBackdrop(nil)
+        end)
+        
+        btn:SetScript("OnClick", function()
+            TurtleDungeonTimer:getInstance():onPreparationDungeonVariantSelected(dungeonKey, variantName)
+        end)
+    end
+end
+
+function TurtleDungeonTimer:onPreparationDungeonVariantSelected(dungeonKey, variantName)
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug] onPreparationDungeonSelected called with: " .. tostring(dungeonName), 0, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] onPreparationDungeonVariantSelected: " .. tostring(dungeonKey) .. " / " .. tostring(variantName), 0, 1, 1)
+    end
+    
+    -- Hide variant menu
+    if self.preparationVariantMenu then
+        self.preparationVariantMenu:Hide()
+        self.preparationVariantMenu = nil
     end
     
     -- Hide selection dialog
@@ -158,16 +263,15 @@ function TurtleDungeonTimer:onPreparationDungeonSelected(dungeonName)
         self.preparationDungeonDialog = nil
     end
     
-    -- Store dungeon selection but DON'T set it yet!
-    -- It will be set only after all players confirm ready
-    self.pendingDungeonSelection = dungeonName
+    -- Store dungeon + variant selection
+    self.pendingDungeonSelection = dungeonKey
+    self.pendingVariantSelection = variantName
     
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Stored pending dungeon selection: " .. tostring(dungeonName), 0, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Stored pending selection: " .. tostring(dungeonKey) .. " / " .. tostring(variantName), 0, 1, 1)
     end
     
-    -- Always show World Buff confirmation dialog (even if no buffs detected)
-    -- This allows players to buff up after selecting "With World Buffs"
+    -- Show World Buff confirmation dialog
     local foundBuffs = self:scanGroupForWorldBuffs()
     self:showWorldBuffConfirmationDialog(foundBuffs)
 end
@@ -810,17 +914,10 @@ function TurtleDungeonTimer:finishReadyCheck()
         -- NOW set the dungeon for everyone (leader + all group members)
         if self:isGroupLeader() and self.pendingDungeonSelection then
             local dungeonKey = self.pendingDungeonSelection
-            local variantKey = nil
-            
-            -- Check if variant is in parentheses
-            local _, _, keyPart, variantPart = string.find(dungeonKey, "^(.+)%s*%((.+)%)$")
-            if keyPart and variantPart then
-                dungeonKey = keyPart
-                variantKey = variantPart
-            end
+            local variantKey = self.pendingVariantSelection
             
             if TurtleDungeonTimerDB.debug then
-                DEFAULT_CHAT_FRAME:AddMessage("[Debug] All ready - now setting dungeon for everyone: " .. dungeonKey .. (variantKey and (" (" .. variantKey .. ")") or ""), 0, 1, 1)
+                DEFAULT_CHAT_FRAME:AddMessage("[Debug] All ready - now setting dungeon for everyone: " .. dungeonKey .. (variantKey and (" / " .. variantKey) or ""), 0, 1, 1)
             end
             
             -- Broadcast dungeon selection to all group members
@@ -912,6 +1009,11 @@ function TurtleDungeonTimer:onZoneChanged()
        (zone and string.find(zone, dungeonName)) or 
        (subZone and string.find(subZone, dungeonName)) or
        (miniMap and string.find(miniMap, dungeonName)) then
+        
+        -- Special handling for Stratholme: Both Living and Undead are in the same zone
+        -- We can't differentiate at zone entry, so we always allow countdown
+        -- The variant will be auto-detected from the first boss kill
+        
         if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Zone match! Starting countdown broadcast")
         end
