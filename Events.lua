@@ -209,14 +209,14 @@ function TurtleDungeonTimer:onAllBossesDefeated()
         local variantData = dungeonData.variants[self.selectedVariant]
         if variantData and variantData.trashMobs then
             if not TDTTrashCounter:isTrashComplete() then
-                -- Bosse sind tot, aber Trash nicht komplett
-                DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Alle Bosse besiegt! Trash noch nicht komplett.", 1, 1, 0)
+                -- Bosses dead, but trash not complete
+                TDT_Print("BOSS_ALL_DEFEATED_TRASH_INCOMPLETE", "success")
                 return  -- Timer continues
             end
         end
     end
     
-    -- Alle Bosse + Trash (falls vorhanden) sind komplett
+    -- All bosses + trash (if any) complete
     self.isRunning = false
     self.runCompleted = true  -- Mark as completed to prevent double-save
     local finalTime = GetTime() - self.startTime
@@ -227,9 +227,21 @@ function TurtleDungeonTimer:onAllBossesDefeated()
     -- Broadcast timer completion to group
     self:broadcastTimerComplete(finalTime)
     
-    self:saveBestTime(finalTime)
-    self:saveLastRun()
-    self:saveToHistory(finalTime, true) -- Mark as completed
+    -- CRITICAL: Final sync BEFORE saving to ensure all players have same data
+    -- Broadcast complete state (time, deaths, trash, bosses)
+    self:broadcastCompleteState()
+    
+    -- Wait 1.5 seconds for sync responses, then save
+    self:scheduleTimer(function()
+        local instance = TurtleDungeonTimer:getInstance()
+        instance:saveBestTime(finalTime)
+        instance:saveLastRun()
+        instance:saveToHistory(finalTime, true) -- Mark as completed
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Debug]|r Run saved after final sync", 0, 1, 0)
+        end
+    end, 1.5, false)
     
     -- Update button text back to START
     self:updateStartPauseButton()
@@ -243,7 +255,7 @@ function TurtleDungeonTimer:onAllBossesDefeated()
         self.frame.dungeonNameText:SetTextColor(0, 1, 0)
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r |cFF00FF00Run komplett! Alle Bosse + Trash besiegt!|r", 1, 1, 0)
+    TDT_Print("RUN_COMPLETE_ALL_DEFEATED", "success")
 end
 
 function TurtleDungeonTimer:showDungeonSwitchDialog(newDungeonName)

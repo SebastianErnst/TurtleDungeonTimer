@@ -575,7 +575,7 @@ function TurtleDungeonTimer:onResetSystemMessage(msg)
     
     -- Check for "Cannot reset" message
     if string.find(msg, "Cannot reset") and string.find(msg, "There are players still inside") then
-        self:failPreparation("Instanz konnte nicht zurückgesetzt werden! Es sind noch Spieler in der Instanz.")
+        self:failPreparation(TDT_L("PREP_INSTANCE_RESET_FAILED_PLAYERS_INSIDE"))
     end
 end
 
@@ -1079,7 +1079,7 @@ function TurtleDungeonTimer:showCountdownFrame()
     number:SetText("10")
     frame.number = number
     
-    -- Title text (optional - könnte auch entfernt werden)
+    -- Title text (optional - could also be removed)
     local title = frame:CreateFontString(nil, "OVERLAY")
     title:SetPoint("TOP", frame, "TOP", 0, -20)
     title:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")

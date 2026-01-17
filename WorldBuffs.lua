@@ -38,7 +38,7 @@ function TurtleDungeonTimer:removeAllWorldBuffs()
         -- Also remove our own buffs
         self:removeOwnWorldBuffs()
         
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r World Buff Entfernung an alle Gruppenmitglieder gesendet.", 1, 0.6, 0)
+        TDT_Print("WB_REMOVAL_SENT", "warning")
     else
         -- Only leaders can initiate group-wide removal
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_REMOVE_WB"), 1, 0, 0)
@@ -91,7 +91,7 @@ function TurtleDungeonTimer:removeWorldBuffsFromUnit(unit)
     end
     
     if removedCount > 0 then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r " .. removedCount .. " World Buffs entfernt.", 1, 0.6, 0)
+        TDT_Print("WB_REMOVED_COUNT", "warning", removedCount)
     elseif TurtleDungeonTimerDB.debug then
         DEFAULT_CHAT_FRAME:AddMessage("[Debug] No world buffs found to remove", 0, 1, 1)
     end
@@ -200,7 +200,7 @@ function TurtleDungeonTimer:markRunWithWorldBuffs()
                 count = count + 1
             end
             
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r World Buffs erkannt! Dieser Run wird dauerhaft als 'Mit World Buffs' markiert. (" .. count .. " Spieler)", 1, 1, 0)
+            TDT_Print("WB_DETECTED_PERMANENT", "success", count)
         end
         
         -- Update UI indicator (always, even when not running)
@@ -213,7 +213,7 @@ function TurtleDungeonTimer:markRunWithWorldBuffs()
                 count = count + 1
             end
             
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r World Buffs erkannt! (" .. count .. " Spieler)", 1, 1, 0)
+            TDT_Print("WB_DETECTED_CURRENT", "success", count)
         end
     else
         -- No buffs found

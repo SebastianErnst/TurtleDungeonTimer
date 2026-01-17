@@ -178,7 +178,7 @@ function TurtleDungeonTimer:createBossRows(scrollChild, orderedBosses, numBosses
         local bossName = orderedBosses[i]
         local isOptional = self.optionalBosses[bossName]
         
-        -- Optional bosse bekommen eine andere Hintergrundfarbe
+        -- Optional bosses get a different background color
         if isOptional then
             bossRow:SetBackdropColor(0.15, 0.15, 0.2, 0.5)
         else

@@ -152,6 +152,26 @@ function TurtleDungeonTimer:syncFrameOnEvent()
         instance:scheduleTimer(function()
             instance:updatePrepareButtonState()
         end, 0.1, false)
+    elseif event == "PARTY_LEADER_CHANGED" then
+        -- Leader changed - update button states for both old and new leader
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Leader changed, updating button states", 1, 1, 0)
+        end
+        
+        -- Update all leader-dependent UI elements
+        instance:updatePrepareButtonState()  -- Prepare button
+        instance:updateStartButton()         -- Start/Abort button
+        
+        -- Update reset button state if it exists
+        if instance.resetButton then
+            if instance:isGroupLeader() then
+                instance.resetButton:Enable()
+                instance.resetButton:SetAlpha(1.0)
+            else
+                instance.resetButton:Disable()
+                instance.resetButton:SetAlpha(0.5)
+            end
+        end
     end
 end
 
@@ -161,6 +181,7 @@ function TurtleDungeonTimer:initializeSync()
         self.syncFrame:RegisterEvent("CHAT_MSG_ADDON")
         self.syncFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
         self.syncFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+        self.syncFrame:RegisterEvent("PARTY_LEADER_CHANGED")
         self.syncFrame:SetScript("OnEvent", TurtleDungeonTimer.syncFrameOnEvent)
     end
     
@@ -891,7 +912,7 @@ function TurtleDungeonTimer:onSyncTimerComplete(timeStr, sender)
     end
     
     -- Display completion message
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r |cFF00FF00" .. sender .. " hat den Run abgeschlossen!|r", 1, 1, 0)
+    TDT_Print("RUN_COMPLETED_BY_PLAYER", "success", sender)
 end
 
 -- ============================================================================
@@ -1006,20 +1027,20 @@ function TurtleDungeonTimer:requestCurrentRunData()
     -- Only request if we're in a group and have a dungeon selected
     if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
         if TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Keine Gruppe - Sync übersprungen", 1, 1, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] No group - sync skipped", 1, 1, 0)
         end
         return
     end
     
     if not self.selectedDungeon or not self.selectedVariant then
         if TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Kein Dungeon/Variant gewählt - Sync übersprungen", 1, 1, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] No dungeon/variant selected - sync skipped", 1, 1, 0)
         end
         return
     end
     
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Sende REQUEST_CURRENT_RUN für " .. self.selectedDungeon .. "/" .. self.selectedVariant, 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Sending REQUEST_CURRENT_RUN for " .. self.selectedDungeon .. "/" .. self.selectedVariant, 1, 1, 0)
     end
     
     -- Initialize response tracking
@@ -1175,7 +1196,7 @@ function TurtleDungeonTimer:processRunDataResponses()
         self.wasInCountdown = false
         
         if TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] wasInCountdown Flag zurückgesetzt", 1, 1, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] wasInCountdown flag reset", 1, 1, 0)
         end
     end
     

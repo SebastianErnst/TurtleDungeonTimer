@@ -12,7 +12,7 @@ end
 
 function TDTTrashScanner:scanCurrentTarget()
     if not UnitExists("target") then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Kein Target vorhanden!", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_NO_TARGET"), 1, 0.5, 0)
         return false
     end
     
@@ -23,7 +23,7 @@ function TDTTrashScanner:scanCurrentTarget()
     local targetClassification = UnitClassification("target") -- normal, elite, rare, worldboss, rareelite
     
     if not targetName or targetName == "" then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Konnte Target-Name nicht lesen!", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_NO_NAME"), 1, 0.5, 0)
         return false
     end
     
@@ -71,12 +71,12 @@ function TDTTrashScanner:scanCurrentTarget()
             count = 1
         }
         table.insert(TurtleDungeonTimerDB.scannedTrash[currentDungeon], mobData)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r Gespeichert: |cffffffff" .. targetName .. "|r - HP: " .. targetMaxHP, 0, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_SAVED"), targetName, targetMaxHP), 0, 1, 0)
     end
     
     -- Show count
     local totalCount = table.getn(TurtleDungeonTimerDB.scannedTrash[currentDungeon])
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[TDT Trash Scanner]|r " .. currentDungeon .. " hat jetzt " .. totalCount .. " verschiedene Mobs gespeichert.", 0, 1, 1)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_TOTAL_MOBS"), currentDungeon, totalCount), 0, 1, 1)
     
     return true
 end
@@ -92,9 +92,9 @@ function TDTTrashScanner:clearCurrentDungeon()
     if TurtleDungeonTimerDB.scannedTrash[currentDungeon] then
         local count = table.getn(TurtleDungeonTimerDB.scannedTrash[currentDungeon])
         TurtleDungeonTimerDB.scannedTrash[currentDungeon] = {}
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[TDT Trash Scanner]|r " .. count .. " Mobs für " .. currentDungeon .. " gelöscht.", 1, 0.8, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_DELETED"), count, currentDungeon), 1, 0.8, 0)
     else
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[TDT Trash Scanner]|r Keine Daten für " .. currentDungeon .. " vorhanden.", 1, 0.8, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_NO_DATA"), currentDungeon), 1, 0.8, 0)
     end
 end
 
@@ -130,22 +130,22 @@ function TDTTrashScanner:exportToChat()
     end
     
     if dungeonCount == 0 then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Keine Daten zum Exportieren!", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_NO_EXPORT_DATA"), 1, 0.5, 0)
         return
     end
     
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========================================", 0, 1, 0)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner Export]", 0, 1, 0)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Export für " .. dungeonCount .. " Dungeons mit " .. totalMobs .. " Mobs", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[" .. TDT_L("TRASH_EXPORT_HEADER") .. "]", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00" .. string.format(TDT_L("TRASH_EXPORT_INFO"), dungeonCount, totalMobs), 0, 1, 0)
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========================================", 0, 1, 0)
     DEFAULT_CHAT_FRAME:AddMessage(" ", 1, 1, 1)
-    DEFAULT_CHAT_FRAME:AddMessage("|cffffff00-- Kopiere diese Daten in Data.lua:", 1, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffffff00" .. TDT_L("TRASH_COPY_TO_DATA"), 1, 1, 0)
     DEFAULT_CHAT_FRAME:AddMessage(" ", 1, 1, 1)
     
     -- Generate Lua code
     for dungeon, mobs in pairs(TurtleDungeonTimerDB.scannedTrash) do
         if table.getn(mobs) > 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffffffff-- " .. dungeon .. " (" .. table.getn(mobs) .. " Mobs)", 1, 1, 1)
+            DEFAULT_CHAT_FRAME:AddMessage("|cffffffff" .. string.format(TDT_L("TRASH_EXPORT_MOBS_COUNT"), dungeon, table.getn(mobs)), 1, 1, 1)
             DEFAULT_CHAT_FRAME:AddMessage("|cffffffff[\"" .. dungeon .. "\"] = {", 1, 1, 1)
             DEFAULT_CHAT_FRAME:AddMessage("|cffffffff    trashMobs = {", 1, 1, 1)
             
@@ -178,13 +178,13 @@ function TDTTrashScanner:exportToChat()
     end
     
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========================================", 0, 1, 0)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Export abgeschlossen!", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00" .. TDT_L("TRASH_EXPORT_COMPLETE"), 0, 1, 0)
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00========================================", 0, 1, 0)
 end
 
 function TDTTrashScanner:showStats()
     if not TurtleDungeonTimerDB.scannedTrash then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r Keine Daten vorhanden!", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Trash Scanner]|r " .. TDT_L("TRASH_NO_EXPORT_DATA"), 1, 0.5, 0)
         return
     end
     
@@ -455,7 +455,7 @@ function TDTTrashScanner:refreshListWindow()
         increaseBtn:SetScript("OnClick", function()
             -- Increase count
             mobRef.count = (mobRef.count or 1) + 1
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r Count erhöht: " .. mobName .. " (Count: " .. mobRef.count .. ")", 0, 1, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT Trash Scanner]|r " .. string.format(TDT_L("TRASH_COUNT_INCREASED_UI"), mobName, mobRef.count), 0, 1, 0)
             TDTTrashScanner:refreshListWindow()
         end)
         

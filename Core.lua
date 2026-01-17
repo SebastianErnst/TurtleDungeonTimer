@@ -14,7 +14,7 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- z = Build number (0-9999, increment on every change)
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
 -- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "0.14.1"
+TurtleDungeonTimer.ADDON_VERSION = "0.14.4"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil
@@ -92,8 +92,14 @@ function TurtleDungeonTimer:initializeDatabase()
                 xOfs = 0,
                 yOfs = -100
             },
-            visible = false
+            visible = false,
+            debug = false  -- Debug mode off by default
         }
+    end
+    
+    -- Debug mode: Always default to false unless explicitly enabled
+    if TurtleDungeonTimerDB.debug == nil then
+        TurtleDungeonTimerDB.debug = false
     end
     
     -- Ensure bestTimes exists for old saves

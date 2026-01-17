@@ -68,6 +68,10 @@ translations.enUS = {
     
     -- World Buffs
     ["WORLD_BUFFS_DETECTED"] = "World Buffs detected! Run will be marked as 'With World Buffs'. (%d players)",
+    ["WB_REMOVAL_SENT"] = "World Buff removal sent to all group members.",
+    ["WB_REMOVED_COUNT"] = "%d World Buffs removed.",
+    ["WB_DETECTED_PERMANENT"] = "World Buffs detected! This run will be permanently marked as 'With World Buffs'. (%d players)",
+    ["WB_DETECTED_CURRENT"] = "World Buffs detected! (%d players)",
     
     -- Sync Messages
     ["SYNC_DATA_FROM"] = "Run data synchronized from %s: %s",
@@ -77,6 +81,11 @@ translations.enUS = {
     ["SYNC_GROUP_IN_COUNTDOWN"] = "Group is in countdown - timer will start soon",
     ["SYNC_TIMER_CONTINUED"] = "Timer continued after reload (Offline time: %s)",
     ["RUN_ABORTED_GROUP_CHANGE"] = "Run aborted! Group composition changed (player joined/left).",
+    
+    -- Boss & Run Completion
+    ["BOSS_ALL_DEFEATED_TRASH_INCOMPLETE"] = "All bosses defeated! Trash not yet complete.",
+    ["RUN_COMPLETE_ALL_DEFEATED"] = "Run complete! All bosses + trash defeated!",
+    ["RUN_COMPLETED_BY_PLAYER"] = "%s has completed the run!",
     
     -- Trash Scanner
     ["TRASH_NO_TARGET"] = "No target!",
@@ -93,6 +102,8 @@ translations.enUS = {
     ["TRASH_EXPORT_HEADER"] = "TDT Trash Scanner Export",
     ["TRASH_EXPORT_INFO"] = "Export for %d dungeons with %d mobs",
     ["TRASH_COPY_TO_DATA"] = "-- Copy this data to Data.lua:",
+    ["TRASH_COUNT_INCREASED_UI"] = "Count increased: %s (Count: %d)",
+    ["TRASH_EXPORT_MOBS_COUNT"] = "%s: %d mobs",
     
     -- Boss Kills
     ["BOSS_KILL_DETECTED"] = "Boss kill detected: %s",
@@ -149,7 +160,7 @@ translations.enUS = {
     ["UI_NEW_DUNGEON_MESSAGE"] = "You are entering %s.\\n\\nReset current run?",
     ["UI_EXPORT_TITLE"] = "Export Run Data",
     ["UI_EXPORT_DESCRIPTION"] = "Export string is also printed in chat for easy copying.",    
-    ["UI_ABORT_RUN_TITLE"] = "Abort Run?",
+    ["UI_ABORT_RUN_TITLE"] = "Abort run?",
     ["UI_ABORT_RUN_MESSAGE"] = "Do you want to abort the current run?",
     ["UI_ABORT_VOTE_MESSAGE"] = "%s wants to abort the run.",
     ["UI_ABORT_VOTE_QUESTION"] = "Do you agree?",
@@ -188,6 +199,16 @@ translations.enUS = {
     -- Timer Messages
     ["TIMER_RESET"] = "Timer has been reset",
     
+    -- World Buff Removal
+    ["WB_REMOVAL_SENT"] = "World Buff removal sent to all group members.",
+    ["WB_REMOVED_COUNT"] = "%d World Buffs removed.",
+    ["WB_DETECTED_PERMANENT"] = "World Buffs detected! This run will be permanently marked as 'With World Buffs'. (%d players)",
+    ["WB_DETECTED"] = "World Buffs detected! (%d players)",
+    
+    -- Trash Scanner Export
+    ["TRASH_EXPORT_COMPLETE"] = "Export complete!",
+    ["TRASH_EXPORT_MOBS_COUNT"] = "-- %s (%d Mobs)",
+    
     -- Preparation Messages
     ["PREP_LEADER_ONLY_PREPARE"] = "Only the group leader can prepare the run!",
     ["PREP_NO_DUNGEON_SELECTED"] = "No dungeon selected!",
@@ -195,6 +216,7 @@ translations.enUS = {
     ["PREP_RESETTING_INSTANCE_MSG"] = "Resetting instance...",
     ["PREP_RESET_SKIPPED_LIMIT"] = "Reset skipped (5/hour limit)",
     ["PREP_INSTANCE_RESET_SUCCESS"] = "Instance has been reset",
+    ["PREP_INSTANCE_RESET_FAILED_PLAYERS_INSIDE"] = "Could not reset instance! There are still players inside the instance.",
     ["PREP_RUN_READY_MSG"] = "Run ready! You can now enter the instance.",
     ["PREP_RESET_CURRENT_RUN"] = "Resetting current run...",
     ["PREP_DUNGEON_CHANGED"] = "%s has selected a different dungeon: %s (you have: %s)",
@@ -218,6 +240,13 @@ translations.enUS = {
     ["PREP_COUNTDOWN_CANCELLED"] = "Countdown cancelled - Timer started!",
     ["PREP_RUN_STARTED"] = "Run started! Good luck!",
     ["PREP_FAILED_REASON"] = "Preparation failed: %s",
+    ["PREP_RESET_FAILED_PLAYERS_INSIDE"] = "Could not reset instance! There are still players inside the instance.",
+    
+    -- Sync Debug Messages (kept in English for consistency)
+    ["SYNC_DEBUG_NO_GROUP"] = "No group - Sync skipped",
+    ["SYNC_DEBUG_NO_DUNGEON"] = "No dungeon/variant selected - Sync skipped",
+    ["SYNC_DEBUG_SENDING_REQUEST"] = "Sending REQUEST_CURRENT_RUN for %s/%s",
+    ["SYNC_DEBUG_COUNTDOWN_FLAG_RESET"] = "wasInCountdown flag reset",
 }
 
 -- German (Deutsch)
@@ -250,6 +279,10 @@ translations.deDE = {
     
     -- World Buffs
     ["WORLD_BUFFS_DETECTED"] = "World Buffs erkannt! Run wird als 'Mit World Buffs' markiert. (%d Spieler)",
+    ["WB_REMOVAL_SENT"] = "World Buff Entfernung an alle Gruppenmitglieder gesendet.",
+    ["WB_REMOVED_COUNT"] = "%d World Buffs entfernt.",
+    ["WB_DETECTED_PERMANENT"] = "World Buffs erkannt! Dieser Run wird dauerhaft als 'Mit World Buffs' markiert. (%d Spieler)",
+    ["WB_DETECTED_CURRENT"] = "World Buffs erkannt! (%d Spieler)",
     
     -- Sync Messages
     ["SYNC_DATA_FROM"] = "Run-Daten synchronisiert von %s: %s",
@@ -259,6 +292,11 @@ translations.deDE = {
     ["SYNC_GROUP_IN_COUNTDOWN"] = "Gruppe ist im Countdown - Timer startet gleich",
     ["SYNC_TIMER_CONTINUED"] = "Timer nach Reload fortgesetzt (Offline Zeit: %s)",
     ["RUN_ABORTED_GROUP_CHANGE"] = "Run abgebrochen! Gruppenzusammensetzung hat sich geändert (Spieler beigetreten/verlassen).",
+    
+    -- Boss & Run Completion
+    ["BOSS_ALL_DEFEATED_TRASH_INCOMPLETE"] = "Alle Bosse besiegt! Trash noch nicht komplett.",
+    ["RUN_COMPLETE_ALL_DEFEATED"] = "Run komplett! Alle Bosse + Trash besiegt!",
+    ["RUN_COMPLETED_BY_PLAYER"] = "%s hat den Run abgeschlossen!",
     
     -- Trash Scanner
     ["TRASH_NO_TARGET"] = "Kein Target vorhanden!",
@@ -275,12 +313,24 @@ translations.deDE = {
     ["TRASH_EXPORT_HEADER"] = "TDT Trash Scanner Export",
     ["TRASH_EXPORT_INFO"] = "Export für %d Dungeons mit %d Mobs",
     ["TRASH_COPY_TO_DATA"] = "-- Kopiere diese Daten in Data.lua:",
+    ["TRASH_COUNT_INCREASED_UI"] = "Count erhöht: %s (Count: %d)",
+    ["TRASH_EXPORT_MOBS_COUNT"] = "%s: %d Mobs",
     
     -- Boss Kills
     ["BOSS_KILL_DETECTED"] = "Boss-Kill erkannt: %s",
     
     -- Export
     ["EXPORT_NO_DATA"] = "Keine Daten zum Exportieren.",
+    
+    -- World Buff Removal
+    ["WB_REMOVAL_SENT"] = "World Buff Entfernung an alle Gruppenmitglieder gesendet.",
+    ["WB_REMOVED_COUNT"] = "%d World Buffs entfernt.",
+    ["WB_DETECTED_PERMANENT"] = "World Buffs erkannt! Dieser Run wird dauerhaft als 'Mit World Buffs' markiert. (%d Spieler)",
+    ["WB_DETECTED"] = "World Buffs erkannt! (%d Spieler)",
+    
+    -- Trash Scanner Export
+    ["TRASH_EXPORT_COMPLETE"] = "Export abgeschlossen!",
+    ["TRASH_EXPORT_MOBS_COUNT"] = "-- %s (%d Mobs)",
     
     -- UI Tooltips
     ["TOOLTIP_ALL_SAME_VERSION"] = "- Alle haben das Addon (gleiche Version)",
@@ -377,6 +427,7 @@ translations.deDE = {
     ["PREP_RESETTING_INSTANCE_MSG"] = "Setze Instanz zurück...",
     ["PREP_RESET_SKIPPED_LIMIT"] = "Reset übersprungen (5/Stunde Limit)",
     ["PREP_INSTANCE_RESET_SUCCESS"] = "Instanz wurde zurückgesetzt",
+    ["PREP_INSTANCE_RESET_FAILED_PLAYERS_INSIDE"] = "Instanz konnte nicht zurückgesetzt werden! Es sind noch Spieler in der Instanz.",
     ["PREP_RUN_READY_MSG"] = "Run bereit! Ihr könnt jetzt die Instanz betreten.",
     ["PREP_RESET_CURRENT_RUN"] = "Setze aktuellen Run zurück...",
     ["PREP_DUNGEON_CHANGED"] = "%s hat einen anderen Dungeon ausgewählt: %s (du hast: %s)",
@@ -400,6 +451,13 @@ translations.deDE = {
     ["PREP_COUNTDOWN_CANCELLED"] = "Countdown abgebrochen - Timer gestartet!",
     ["PREP_RUN_STARTED"] = "Run gestartet! Viel Erfolg!",
     ["PREP_FAILED_REASON"] = "Vorbereitung fehlgeschlagen: %s",
+    ["PREP_RESET_FAILED_PLAYERS_INSIDE"] = "Instanz konnte nicht zurückgesetzt werden! Es sind noch Spieler in der Instanz.",
+    
+    -- Sync Debug Messages (kept in English for consistency)
+    ["SYNC_DEBUG_NO_GROUP"] = "Keine Gruppe - Sync übersprungen",
+    ["SYNC_DEBUG_NO_DUNGEON"] = "Kein Dungeon/Variant gewählt - Sync übersprungen",
+    ["SYNC_DEBUG_SENDING_REQUEST"] = "Sende REQUEST_CURRENT_RUN für %s/%s",
+    ["SYNC_DEBUG_COUNTDOWN_FLAG_RESET"] = "wasInCountdown Flag zurückgesetzt",
 }
 
 -- ============================================================================

@@ -1174,16 +1174,29 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
         btn:SetHeight(18)
         btn:SetPoint("TOP", reportDropdown, "TOP", 0, -4 - (i-1) * 20)
         
+        -- Set initial backdrop (WoW 1.12 doesn't have GetBackdrop, so set it once)
+        btn:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true,
+            tileSize = 16,
+            edgeSize = 16,
+            insets = {left = 4, right = 4, top = 4, bottom = 4}
+        })
+        btn:SetBackdropColor(0, 0, 0, 0)  -- Start transparent
+        btn:SetBackdropBorderColor(0, 0, 0, 0)  -- Start transparent
+        
         local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("CENTER", btn, "CENTER", 0, 0)
         text:SetText(chatLabel)
         
         btn:SetScript("OnEnter", function()
-            this:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-            this:SetBackdropCexportHistoryEntryolor(0.3, 0.3, 0.3, 0.8)
+            this:SetBackdropColor(0.3, 0.3, 0.3, 0.8)
+            this:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
         end)
         btn:SetScript("OnLeave", function()
-            this:SetBackdrop(nil)
+            this:SetBackdropColor(0, 0, 0, 0)
+            this:SetBackdropBorderColor(0, 0, 0, 0)
         end)
         
         -- Capture entry in local variable for closure

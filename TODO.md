@@ -2,23 +2,52 @@
 
 ## 🐛 Known Bugs
 
+### Final Sync beim Run Completion fehlt
+- **Problem:** Wenn der Run abgeschlossen ist, werden die Daten sofort gespeichert, OHNE vorher einen finalen Gruppen-Sync durchzuführen
+- **Priorität:** KRITISCH ✅ FIXED in v0.14.2 (1.5s Sync-Wait implementiert)
+- **Details:**
+  - Verschiedene Spieler können unterschiedliche Statistiken haben (Zeit, Trash-Count, Tode)
+  - `broadcastTimerComplete()` sendet nur Completion-Nachricht, NICHT die vollständigen Daten
+  - Speichern passiert sofort in `onAllBossesDefeated()` ohne Sync-Wait
+- **Lösung:** Final Sync VOR dem Speichern mit 1.5s Wait implementiert
+
 ### Timer wird beim Login/Reload abgebrochen
 - **Problem:** Wenn ein Spieler einloggt/reloadet, wird der laufende Timer abgebrochen, weil das System denkt, dass sich die Gruppengröße geändert hat
-- **Priorität:** KRITISCH
+- **Priorität:** KRITISCH ✅ FIXED in v0.14.1 (Grace Period implementiert)
 - **Details:**
   - GROUP_ROSTER_UPDATE Event feuert beim Login des Spielers
   - System erkennt Spieler als "neu" in der Gruppe
   - lastGroupSize wird möglicherweise falsch initialisiert
   - Run wird mit "Group composition changed" abgebrochen
-- **Betroffene Events:**
-  - PLAYER_ENTERING_WORLD (triggert requestCurrentRunData nach 2s)
-  - PARTY_MEMBERS_CHANGED / RAID_ROSTER_UPDATE (triggert Gruppencheck)
-  - Timing-Konflikt zwischen beiden Events
-- **Lösungsansätze:**
-  1. Grace Period beim Login: Erste 5-10 Sekunden keine Group-Change-Aborts
-  2. Bessere Tracking-Logik: Namen statt nur Größe tracken
-  3. Sync-Nachrichten nutzen: Wenn jemand einloggt und Run läuft, keine Gruppe-Changed-Nachricht senden
-  4. PLAYER_ENTERING_WORLD ignorieren für Group-Size-Tracking
+- **Lösung:** Grace Period von 8 Sekunden nach Login implementiert
+
+### Button State beim Group Leader Wechsel
+- **Problem:** Wenn der Group Lead übertragen wird, müssen die Button-States aktualisiert werden
+- **Priorität:** Hoch ✅ FIXED in v0.14.2 (PARTY_LEADER_CHANGED Event)
+- **Details:**
+  - Alter Leader: Abort/Start Button sollte grau werden (nicht mehr Leader)
+  - Neuer Leader: Button sollte rot/grün werden (aktiv)
+  - Aktuell: Buttons bleiben im alten State bis UI-Refresh
+- **Lösung:**
+  - PARTY_LEADER_CHANGED Event registriert
+  - Alle Leader-abhängigen Buttons werden automatisch aktualisiert
+  - Start/Abort, Prepare, Reset Buttons alle synchronisiert
+
+### Debug Mode wird beim Login nicht deaktiviert
+- **Problem:** Debug Mode bleibt nach Login/Reload aktiv
+- **Priorität:** Mittel ✅ FIXED in v0.14.2
+- **Details:**
+  - TurtleDungeonTimerDB.debug sollte beim Login standardmäßig false sein
+  - Nur explizit aktiviert lassen wenn Entwickler-Flag gesetzt
+- **Lösung:** In Core.lua initialize(): debug standardmäßig false, auch bei Updates
+
+### Kapitalisierung in Übersetzungen
+- **Problem:** Inkonsistente Groß-/Kleinschreibung in englischen Texten
+- **Priorität:** Niedrig (Kosmetisch) ✅ FIXED in v0.14.2
+- **Zu korrigieren:**
+  - "no" → "No" (Button-Text) ✅ Bereits korrekt
+  - "Abort Run?" → "Abort run?" (Dialog-Titel) ✅ Korrigiert
+- **Status:** Alle Kapitalisierungen korrigiert
 
 ### Sync Check beim Login fehlschlägt
 - **Problem:** Beim Einloggen kommt ein Sync-Check, der failed, obwohl alle Spieler Version 0.14.0 haben
