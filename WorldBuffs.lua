@@ -97,29 +97,7 @@ function TurtleDungeonTimer:removeWorldBuffsFromUnit(unit)
     end
 end
 
--- Iterator for group members
-function TurtleDungeonTimer:iterateGroupMembers()
-    local members = {"player"}
-    
-    if GetNumRaidMembers() > 0 then
-        for i = 1, GetNumRaidMembers() do
-            local name = GetRaidRosterInfo(i)
-            if name and name ~= UnitName("player") then
-                table.insert(members, "raid" .. i)
-            end
-        end
-    elseif GetNumPartyMembers() > 0 then
-        for i = 1, GetNumPartyMembers() do
-            table.insert(members, "party" .. i)
-        end
-    end
-    
-    local index = 0
-    return function()
-        index = index + 1
-        return members[index]
-    end
-end
+-- Iterator for group members - Removed (unused)
 
 -- ============================================================================
 -- BUFF SCANNING FUNCTIONS

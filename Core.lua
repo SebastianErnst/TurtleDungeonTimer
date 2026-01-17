@@ -8,9 +8,13 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- ============================================================================
 -- VERSION MANAGEMENT (SINGLE SOURCE OF TRUTH)
 -- ============================================================================
+-- VERSION FORMAT: x.y.z
+-- x = Release number (currently 0 for development)
+-- y = Feature version (0-999, increment when user says "funktioniert", reset z to 0)
+-- z = Build number (0-9999, increment on every change)
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
 -- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "1.0.11-alpha"
+TurtleDungeonTimer.ADDON_VERSION = "0.14.0"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil

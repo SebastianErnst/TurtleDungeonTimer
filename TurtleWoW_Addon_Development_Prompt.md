@@ -458,29 +458,47 @@ end
 
 **⚠️ CRITICAL:** When updating the addon version, you MUST update it in TWO places (Single Source of Truth):
 
-1. **Core.lua** - The `ADDON_VERSION` constant (full version with -alpha/-beta suffix)
+1. **Core.lua** - The `ADDON_VERSION` constant
 2. **TurtleDungeonTimer.toc** - The `## Version:` field (must match Core.lua exactly)
 
+**Version Format: x.y.z**
+- **x** = Release number (currently 0 for development, will be 1+ for production releases)
+- **y** = Feature version (0-999)
+  - Increment when user confirms functionality with "funktioniert"
+  - Reset z to 0 when incrementing y
+- **z** = Build number (0-9999)
+  - Increment on EVERY code change made by AI assistant
+  - Automatically incremented during development
+
 ```lua
--- In Core.lua (lines ~11-14)
+-- In Core.lua (lines ~11-18)
 -- ============================================================================
 -- VERSION MANAGEMENT (SINGLE SOURCE OF TRUTH)
 -- ============================================================================
+-- VERSION FORMAT: x.y.z
+-- x = Release number (currently 0 for development)
+-- y = Feature version (0-999, increment when user says "funktioniert", reset z to 0)
+-- z = Build number (0-9999, increment on every change)
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
 -- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "1.0.6-alpha"
+TurtleDungeonTimer.ADDON_VERSION = "0.14.0"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 ```
+
+**Version Update Rules:**
+1. **Build number (z)**: Increment automatically on every code change
+2. **Feature version (y)**: Increment when user says "funktioniert", then reset z to 0
+3. **Release number (x)**: Only change for major production releases
+
+**Version Display:**
+- Version is shown in chat when addon loads: "[Turtle Dungeon Timer] Version 0.14.0 loaded"
+- Always keep Core.lua and .toc file versions synchronized
 
 **Why this matters:** 
 - All other files (Sync.lua, Preparation.lua, etc.) reference `self.ADDON_VERSION` or `self.SYNC_VERSION`
 - The sync system checks version compatibility between party members
 - Having a single source of truth prevents version mismatches and sync failures
-
-**When to update:** 
-- Every time you increment the version for a release
-- Update BOTH `ADDON_VERSION` in Core.lua AND `## Version:` in .toc file
-- Keep them identical (including -alpha/-beta suffix)
+- Version tracking helps identify when issues were introduced
 
 **Protocol Version (`SYNC_VERSION`):**
 - Only change when sync message format changes (breaking compatibility)

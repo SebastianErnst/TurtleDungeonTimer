@@ -3,14 +3,6 @@
 -- ============================================================================
 
 TurtleDungeonTimer.DUNGEON_DATA = {
-    -- ["Black Morass"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = {"Chronar", "Epidamu", "Drifting Avatar of Sand", "Time-Lord Epochronos", "Mossheart", "Antnormi", "Rotmaw"}
-    --         }
-    --     }
-    -- },
     ["Stormwind Vault"] = {
         isDungeon = true,
         variants = {
@@ -95,9 +87,6 @@ TurtleDungeonTimer.DUNGEON_DATA = {
     ["Dire Maul"] = {
         isDungeon = true,
         variants = {
-            -- ["East"] = {
-            --     bosses = {"Pusillin", "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", "Alzzin the Wildshaper"}
-            -- },
             ["West"] = {
                 bosses = {"Tendris Warpwood", "Illyanna Ravenoak", "Magister Kalendris", "Immol'thar", "Prince Tortheldrin"},
                 optionalBosses = {
@@ -154,43 +143,8 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             {name = "Warpwood Treant", level = 54, hp = 8869, count = 1}
                 }
             }
-            -- ["North"] = {
-            --     bosses = {"Guard Mol'dar", "Stomper Kreeg", "Guard Fengus", "Guard Slip'kik", "Captain Kromcrush", "Cho'Rush the Observer", "King Gordok"}
-            -- }
         }
     },
-    -- ["Upper Blackrock Spire"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = {"Pyroguard Emberseer", "Solakar Flamewreath", "Warchief Rend Blackhand", "The Beast", "General Drakkisath"},
-    --             optionalBosses = {
-    --                 ["Jed Runewatcher"] = true, -- Rare
-    --                 ["Goraluk Anvilcrack"] = true -- Rare
-    --             }
-    --         }
-    --     }
-    -- },
-    -- ["Zul'Gurub"] = {
-    --     isDungeon = false, -- 20-man raid
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = {
-    --                 "High Priestess Jeklik",
-    --                 "High Priest Venoxis",
-    --                 "High Priestess Mar'li",
-    --                 "Bloodlord Mandokir",
-    --                 "High Priest Thekal",
-    --                 "High Priestess Arlokk",
-    --                 "Jin'do the Hexxer",
-    --                 "Hakkar the Soulflayer"
-    --             },
-    --             optionalBosses = {
-    --                 ["Gahz'ranka"] = true -- Summoned hydra boss
-    --             }
-    --         }
-    --     }
-    -- },
     ["The Stockade"] = {
         isDungeon = true,
         variants = {
@@ -216,38 +170,6 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             }
         }
     }
-    -- -- CLASSIC DUNGEONS
-    -- ["Ragefire Chasm"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = {"Taragaman the Hungerer", "Jergosh the Invoker"}
-    --         }
-    --     }
-    -- },
-    -- ["Wailing Caverns"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = {"Lady Anacondra", "Lord Cobrahn", "Lord Pythas", "Lord Serpentis", "Skum", "Verdan the Everliving", "Mutanus the Devourer"},
-    --             optionalBosses = {
-    --                 ["Trigore the Lasher"] = true, -- Rare
-    --                 ["Boahn"] = true, -- Rare
-    --                 ["Deviate Faerie Dragon"] = true -- Rare
-    --             }
-    --         }
-    --     }
-    -- },
-    -- ["The Deadmines"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = {"Rhahk'Zor", "Sneed", "Gilnid", "Mr. Smite", "Captain Greenskin", "Edwin VanCleef"},
-    --             optionalBosses = {
-    --                 ["Marisa du'Paige"] = true, -- Rare
-    --                 ["Brainwashed Noble"] = true, -- Rare
-    --                 ["Miner Johnson"] = true -- Rare
-    --             }
     --         }
     --     }
     -- },

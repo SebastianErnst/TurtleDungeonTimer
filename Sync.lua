@@ -5,6 +5,7 @@
 
 TurtleDungeonTimer.SYNC_PREFIX = "TDT_SYNC"
 TurtleDungeonTimer.SYNC_INTERVAL = 10  -- Periodic sync interval in seconds (configurable for testing)
+TurtleDungeonTimer.GROUP_CHECK_DEBOUNCE = 2.0  -- Debounce group change checks (seconds)
 TurtleDungeonTimer.playersWithAddon = {}
 TurtleDungeonTimer.resetVotes = {}
 TurtleDungeonTimer.resetInitiator = nil
@@ -14,6 +15,7 @@ TurtleDungeonTimer.abortInitiator = nil
 TurtleDungeonTimer.abortVoteDialog = nil
 TurtleDungeonTimer.currentRunId = nil
 TurtleDungeonTimer.lastPeriodicSync = 0  -- Track last periodic sync time
+TurtleDungeonTimer.lastGroupCheck = 0  -- Track last group change check
 TurtleDungeonTimer.isGroupLeader = false  -- Track if we're the group leader
 
 -- ============================================================================
@@ -45,7 +47,7 @@ function TurtleDungeonTimer:onAddonCheckResponse(sender, version)
     if not self.preparationChecks then
         self.preparationChecks = {}
     end
-    self.preparationChecks[sender] = version or self.SYNC_VERSION
+    self.preparationChecks[sender] = version or self.ADDON_VERSION
     
     -- Check major version compatibility
     if version and not self:isVersionCompatible(version) then
@@ -61,6 +63,20 @@ function TurtleDungeonTimer:getAddonUserCount()
     return count
 end
 
+function TurtleDungeonTimer:getCurrentGroupSize()
+    local raidMembers = GetNumRaidMembers()
+    if raidMembers > 0 then
+        return raidMembers
+    end
+    
+    local partyMembers = GetNumPartyMembers()
+    if partyMembers > 0 then
+        return partyMembers + 1  -- +1 for player
+    end
+    
+    return 1  -- Solo
+end
+
 -- ============================================================================
 -- SYNC INITIALIZATION
 -- ============================================================================
@@ -73,16 +89,53 @@ function TurtleDungeonTimer:syncFrameOnEvent()
             instance:onSyncMessage(message, sender, channel)
         end
     elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
-        -- Check if a run is active - if yes, abort it due to group composition change
+        -- WoW 1.12 Bug: These events fire spuriously (sometimes on every monster kill)
+        -- Solution: Only react to ACTUAL group size changes with debouncing
+        
+        -- Debounce: Only check group changes every N seconds
+        local now = GetTime()
+        if now - instance.lastGroupCheck < instance.GROUP_CHECK_DEBOUNCE then
+            -- Too soon, skip ALL processing (not just abort check)
+            if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Group event debounced", 0.5, 0.5, 0.5)
+            end
+            return
+        end
+        instance.lastGroupCheck = now
+        
+        -- Track actual group size changes
+        local currentGroupSize = instance:getCurrentGroupSize()
+        local previousGroupSize = instance.lastGroupSize or currentGroupSize
+        instance.lastGroupSize = currentGroupSize
+        
+        -- Debug output
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Group event: size=" .. currentGroupSize .. " (was " .. previousGroupSize .. ")", 1, 1, 0)
+        end
+        
+        -- Only react if group size ACTUALLY changed
+        if currentGroupSize == previousGroupSize then
+            -- False alarm - spurious event, ignore completely
+            if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Group size unchanged, ignoring event", 0.5, 0.5, 0.5)
+            end
+            return
+        end
+        
+        -- Real group change detected!
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Real group change detected!", 1, 0.5, 0)
+        end
+        
+        -- Abort active run if group composition changed
         if instance.isRunning or instance.isCountingDown then
-            -- Send sync message to inform all group members
             instance:sendSyncMessage("ABORT_GROUP_CHANGE")
             DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
             instance:abortRun()
         end
         
+        -- Update addon user list and UI
         instance:checkForAddons()
-        -- Delay button update because group status might not be updated immediately
         instance:scheduleTimer(function()
             instance:updatePrepareButtonState()
         end, 0.1, false)
@@ -97,6 +150,9 @@ function TurtleDungeonTimer:initializeSync()
         self.syncFrame:RegisterEvent("RAID_ROSTER_UPDATE")
         self.syncFrame:SetScript("OnEvent", TurtleDungeonTimer.syncFrameOnEvent)
     end
+    
+    -- Initialize group size tracking
+    self.lastGroupSize = self:getCurrentGroupSize()
     
     self:checkForAddons()
     self:updatePrepareButtonState()
@@ -225,7 +281,7 @@ function TurtleDungeonTimer:onSyncMessage(message, sender, channel)
     end
     
     if msgType == "ADDON_CHECK" then
-        self:sendSyncMessage("ADDON_RESPONSE", self.SYNC_VERSION)
+        self:sendSyncMessage("ADDON_RESPONSE", self.ADDON_VERSION)
     elseif msgType == "ADDON_RESPONSE" then
         self:onAddonCheckResponse(sender, data)
     elseif msgType == "RESET_REQUEST" then
@@ -674,34 +730,25 @@ function TurtleDungeonTimer:showAbortConfirmationDialog()
 end
 
 function TurtleDungeonTimer:abortRun()
-    -- Stop timer and reset state
-    self.isRunning = false
-    self.startTime = nil
-    self.restoredElapsedTime = nil
-    
-    -- Set flag to prevent auto-restart from sync
-    -- This flag will be cleared when starting a new run manually
-    self.runAborted = true
-    
     -- Stop countdown if running
     if self.preparationState == "COUNTDOWN" then
         self:stopCountdown()
     end
-    
-    -- Reset preparation state so button shows "Start" again
-    self.preparationState = nil
-    
-    -- Stop countdown if running
     if self.countdownTriggered then
         self:stopCountdown()
     end
     
-    -- Update UI
-    self:updateTimerDisplay()
-    self:updateStartButton()
+    -- Reset preparation state
+    self.preparationState = nil
     
-    -- Save state
-    self:saveLastRun()
+    -- FULL RESET: Abort button now does a complete reset with all data cleared
+    self:performResetDirect(false)
+    
+    -- Set flag to prevent auto-restart from sync or combat
+    self.runAborted = true
+    
+    -- Force button update to show "Start" text
+    self:updateStartButton()
 end
 
 -- ============================================================================

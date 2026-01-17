@@ -168,7 +168,6 @@ function TurtleDungeonTimer:selectDungeon(dungeonName)
         self:selectVariant(firstVariant)
     else
         -- No auto-select
-        TDTTrashCounter:hideTrashBar()
         self:rebuildBossRows()
     end
 end
@@ -862,33 +861,9 @@ function TurtleDungeonTimer:updateWorldBuffsIndicator()
     end
 end
 
-function TurtleDungeonTimer:updateDungeonName()
-    if not self.frame or not self.frame.dungeonNameText then return end
-
-    if self.selectedDungeon then
-        local dungeonData = self.DUNGEON_DATA[self.selectedDungeon]
-        if dungeonData then
-            self.frame.dungeonNameText:SetText(dungeonData.name)
-        end
-    else
-        self.frame.dungeonNameText:SetText(TDT_L("UI_LEADER_SELECT_DUNGEON"))
-    end
-end
-
 -- ============================================================================
 -- START/STOP BUTTON UPDATE
 -- ============================================================================
-function TurtleDungeonTimer:updateStartPauseButton()
-    if not self.frame or not self.frame.startButton then return end
-
-    if self.isRunning then
-        -- Show stop icon
-        self.frame.startButton.icon:SetTexture("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up")
-    else
-        -- Show play icon
-        self.frame.startButton.icon:SetTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
-    end
-end
 
 function TurtleDungeonTimer:updateStartButton()
     if not self.frame or not self.frame.startBtn then return end
@@ -1417,6 +1392,20 @@ function TurtleDungeonTimer:resetUI()
             self.bossList[i].defeated = false
         end
     end
+    
+    -- Force reset of boss rows (even if collapsed) to clear times
+    if self.frame and self.frame.bossRows then
+        for i = 1, table.getn(self.frame.bossRows) do
+            local row = self.frame.bossRows[i]
+            if row and row.time and row.time.SetText then
+                row.time:SetText("--:--")
+                row.time:SetTextColor(0.5, 0.5, 0.5)
+            end
+            if row and row.name and row.name.SetTextColor then
+                row.name:SetTextColor(1, 1, 1)
+            end
+        end
+    end
 
     self:updateUI()
 
@@ -1430,77 +1419,7 @@ function TurtleDungeonTimer:updateFrameSize()
     end
 end
 
-function TurtleDungeonTimer:setDungeonSelectorEnabled(enabled)
-    -- Dungeon name is always clickable in new design
-end
-
-function TurtleDungeonTimer:rebuildBossRows()
-    -- Clear existing rows
-    if self.frame and self.frame.bossRows then
-        for i = 1, table.getn(self.frame.bossRows) do
-            if self.frame.bossRows[i] then
-                self.frame.bossRows[i]:Hide()
-                self.frame.bossRows[i] = nil
-            end
-        end
-        self.frame.bossRows = {}
-    end
-
-    -- Update if expanded
-    if self.bossListExpanded then
-        self:expandBossList()
-    end
-end
-
-function TurtleDungeonTimer:updateBestTimeDisplay()
-    -- Not needed in new design (no best time display in header)
-end
-
 function TurtleDungeonTimer:updatePrepareButtonState()
     -- Update start button when group composition changes
     self:updateStartButton()
-end
-
-function TurtleDungeonTimer:toggleMinimized()
-    -- No minimize button in new design - just ignore
-end
-
-function TurtleDungeonTimer:updateMinimizedState()
-    -- No minimize functionality in new design - just ignore
-end
-
--- Called when a boss is killed - update UI
-function TurtleDungeonTimer:onBossKilled(bossIndex)
-    if self.bossList[bossIndex] and type(self.bossList[bossIndex]) == "table" then
-        self.bossList[bossIndex].defeated = true
-    end
-
-    if self.bossListExpanded then
-        self:updateBossRows()
-    end
-end
-
--- ============================================================================
--- SHOW/HIDE
--- ============================================================================
-function TurtleDungeonTimer:show()
-    if self.frame then
-        self.frame:Show()
-    end
-end
-
-function TurtleDungeonTimer:hide()
-    if self.frame then
-        self.frame:Hide()
-    end
-end
-
-function TurtleDungeonTimer:toggleVisibility()
-    if not self.frame then return end
-
-    if self.frame:IsShown() then
-        self:hide()
-    else
-        self:show()
-    end
 end

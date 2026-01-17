@@ -147,7 +147,8 @@ end
 
 function TurtleDungeonTimer:onPlayerDeath(playerName)
     -- Auto-start timer if not running but dungeon is selected
-    if not self.isRunning and self.selectedDungeon and self.selectedVariant then
+    -- Don't auto-start if run was aborted
+    if not self.isRunning and self.selectedDungeon and self.selectedVariant and not self.runAborted then
         -- Start timer automatically on first death
         self:start()
     end
@@ -186,7 +187,8 @@ function TurtleDungeonTimer:onCombatStart()
     -- Auto-start timer when entering combat if:
     -- 1. Timer is not already running
     -- 2. We have a dungeon selected
-    if not self.isRunning and self.selectedDungeon and self.selectedVariant then
+    -- 3. Run was not aborted
+    if not self.isRunning and self.selectedDungeon and self.selectedVariant and not self.runAborted then
         self:start()
     end
 end
@@ -227,6 +229,7 @@ function TurtleDungeonTimer:onAllBossesDefeated()
     
     -- Update button text back to START
     self:updateStartPauseButton()
+    self:updateStartButton()  -- Update Start/Abort button
     
     -- Highlight dungeon name
     if self.frame and self.frame.headerBg then

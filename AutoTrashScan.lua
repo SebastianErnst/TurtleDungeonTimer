@@ -39,17 +39,7 @@ local function getNextAvailableMark()
     return nil  -- All marks in use
 end
 
--- Free a raid mark for reuse
-local function freeRaidMark(markIndex)
-    if markIndex and markIndex >= 1 and markIndex <= 8 then
-        pullScan.usedMarks[markIndex] = nil
-        pullScan.raidMarks[markIndex] = nil
-        
-        if TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FFFF[TDT Auto Scan]|r Freed raid mark " .. markIndex, 0, 1, 1)
-        end
-    end
-end
+-- Free a raid mark for reuse - Removed (unused)
 
 -- Reset all raid marks
 local function resetRaidMarks()
@@ -149,7 +139,9 @@ end
 
 function TDTAutoTrashScan:onEnterCombat()
     if not pullScan.enabled then 
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r Scanner is disabled, use /tdt autoscanon", 1, 0.5, 0)
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r Scanner is disabled, use /tdt autoscanon", 1, 0.5, 0)
+        end
         return 
     end
     
@@ -338,7 +330,7 @@ function TDTAutoTrashScan:onTargetChanged()
         "{cross}",    -- 7
         "{skull}"     -- 8
     }
-    local iconName = markIcons[markIndex] or "Mark " .. markIndex
+    local iconName = markIcons[markIndex] or ("Mark " .. markIndex)
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FFFF[Auto Scan]|r " .. iconName .. " " .. name .. " (" .. markedCount .. "/8)", 0.5, 1, 1)
     
     if TurtleDungeonTimerDB.debug then

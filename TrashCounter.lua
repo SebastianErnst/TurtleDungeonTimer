@@ -130,14 +130,12 @@ function TDTTrashCounter:prepareDungeon(dungeonName, variantName)
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[dungeonName]
     
     if not dungeonData or not dungeonData.variants then
-        self:hideTrashBar()
         return
     end
     
     local variantData = dungeonData.variants[variantName]
     if not variantData or not variantData.trashMobs then
-        -- No trash data for this variant, hide the bar
-        self:hideTrashBar()
+        -- No trash data for this variant
         return
     end
     
@@ -189,10 +187,6 @@ function TDTTrashCounter:stopDungeon()
     currentDungeon = nil
     killedTrashHP = 0
     self:updateUI()
-end
-
-function TDTTrashCounter:hideTrashBar()
-    -- Not needed - progress bar is part of main UI now
 end
 
 function TDTTrashCounter:resetProgress(dungeonName)
@@ -453,27 +447,5 @@ end
 -- All clients receive the kill via onSyncTrashKill() and process it
 
 -- ============================================================================
--- Debug Commands
+-- Debug Commands - Removed (unused)
 -- ============================================================================
-
-function TDTTrashCounter:debugStart(dungeonName)
-    local name = dungeonName or "The Stockade"
-    self:startDungeon(name)
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Debug: Started " .. name)
-end
-
-function TDTTrashCounter:debugKill(mobName)
-    self:onMobKilled(mobName)
-end
-
-function TDTTrashCounter:debugShow()
-    if currentDungeon then
-        local progress, killed, total = self:getProgress()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r Current Progress:")
-        DEFAULT_CHAT_FRAME:AddMessage(string.format("  %.1f%% (%s / %s HP)", 
-            progress, formatHP(killed), formatHP(total)))
-        DEFAULT_CHAT_FRAME:AddMessage("  Required: " .. (currentDungeon.trashRequiredPercent or 100) .. "%")
-    else
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash]|r No active dungeon")
-    end
-end

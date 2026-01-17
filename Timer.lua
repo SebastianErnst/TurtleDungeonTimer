@@ -70,20 +70,12 @@ function TurtleDungeonTimer:start()
         end
     end
     
-    -- Disable dungeon selector while running
-    self:setDungeonSelectorEnabled(false)
-    
     -- Save initial state
     self:saveLastRun()
     
     -- Reset UI
     self:resetUI()
     self:updateStartButton()  -- Update button to show "Abort"
-    
-    -- Minimize the frame
-    if not self.minimized then
-        self:toggleMinimized()
-    end
 end
 
 function TurtleDungeonTimer:showResetConfirmation()
@@ -162,9 +154,6 @@ function TurtleDungeonTimer:pause()
     -- Save paused state
     self:saveLastRun()
     
-    -- Enable dungeon selector again
-    self:setDungeonSelectorEnabled(true)
-    
     DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Timer pausiert!", 1, 1, 0)
     
     -- Update button text
@@ -179,93 +168,32 @@ function TurtleDungeonTimer:reset()
         and lastRun.killTimes and table.getn(lastRun.killTimes) > 0
     local hasCurrentData = table.getn(self.killTimes) > 0 or self.deathCount > 0 or self.isRunning
     
-    -- if hasLastRun or hasCurrentData then
-        -- Show reset confirmation dialog
-        self:showResetConfirmation()
-    --     return
-    -- end
-    
-    -- self:performReset()
+    -- Show reset confirmation dialog
+    self:showResetConfirmation()
 end
 
 function TurtleDungeonTimer:performReset()
-    -- Check if we're in a group
-    -- if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
-        -- Solo: Reset directly
-        self:syncTimerReset()
-    --     return
-    -- end
-    
-    -- In a group: Show confirmation dialog before starting vote
-    -- self:showResetInitiateConfirmation()
+    -- Start the reset process via sync system
+    -- This will handle both solo and group scenarios
+    self:syncTimerReset()
 end
 
-function TurtleDungeonTimer:showResetInitiateConfirmation()
-    -- Create confirmation dialog
-    local dialog = CreateFrame("Frame", nil, UIParent)
-    dialog:SetWidth(350)
-    dialog:SetHeight(150)
-    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
-    dialog:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true,
-        tileSize = 32,
-        edgeSize = 32,
-        insets = {left = 11, right = 12, top = 12, bottom = 11}
-    })
-    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
-    dialog:EnableMouse(true)
-    
-    -- Title
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", dialog, "TOP", 0, -15)
-    title:SetText("Timer Reset")
-    title:SetTextColor(1, 0.82, 0)
-    
-    -- Message
-    local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    message:SetPoint("TOP", title, "BOTTOM", 0, -15)
-    message:SetWidth(300)
-    message:SetText(TDT_L("UI_RESET_VOTE_QUESTION"))
-    message:SetJustifyH("CENTER")
-    
-    -- Yes Button
-    local yesButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
-    yesButton:SetWidth(100)
-    yesButton:SetHeight(30)
-    yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
-    yesButton:SetText(TDT_L("YES"))
-    yesButton:SetScript("OnClick", function()
-        dialog:Hide()
-        -- Start voting process (this also acts as addon check)
-        TurtleDungeonTimer:getInstance():syncTimerReset()
-    end)
-    
-    -- No Button
-    local noButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
-    noButton:SetWidth(100)
-    noButton:SetHeight(30)
-    noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
-    noButton:SetText(TDT_L("no"))
-    noButton:SetScript("OnClick", function()
-        dialog:Hide()
-    end)
-    
-    dialog:Show()
-end
-
-function TurtleDungeonTimer:performResetDirect()
-    -- Direct reset without voting
+-- ============================================================================
+-- PRIVATE: Common reset logic
+-- ============================================================================
+local function resetRunDataCommon(self)
+    -- Stop timer
     self.isRunning = false
-    self.killTimes = {}
-    self.deathCount = 0
     self.startTime = nil
     self.restoredElapsedTime = nil
+    
+    -- Clear run data
+    self.killTimes = {}
+    self.deathCount = 0
+    
     -- Reset run-specific World Buff flags and lists
     self.runWithWorldBuffs = nil
     self.runWorldBuffPlayers = {}
-    -- hasWorldBuffs and worldBuffPlayers are managed by continuous scanning
     
     -- Clear Run ID
     self:clearRunId()
@@ -277,9 +205,7 @@ function TurtleDungeonTimer:performResetDirect()
         end
     end
     
-    -- DON'T stop world buff scanning - it runs continuously now
-    
-    -- Reset trash counter
+    -- Stop trash counter
     TDTTrashCounter:stopDungeon()
     
     -- Clear last run from database
@@ -288,50 +214,27 @@ function TurtleDungeonTimer:performResetDirect()
     -- Reset UI
     self:resetUI()
     
-    -- Explicitly update World Buffs indicator after reset
+    -- Update World Buffs indicator
     self:updateWorldBuffsIndicator()
     
-    -- Enable dungeon selector again
-    self:setDungeonSelectorEnabled(true)
-    
     -- Update button text
     self:updateStartPauseButton()
-    
-    -- Show success message
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("TIMER_RESET"), 1, 1, 0)
 end
 
-function TurtleDungeonTimer:performResetSilent()
-    -- Silent reset without sync (used by sync system)
-    self.isRunning = false
-    self.killTimes = {}
+function TurtleDungeonTimer:performResetDirect(silent)
+    -- Complete reset with all data cleared
+    -- silent: if true, don't show chat message
+    resetRunDataCommon(self)
     
-    -- Reset all boss defeated flags
-    for i = 1, table.getn(self.bossList) do
-        if type(self.bossList[i]) == "table" then
-            self.bossList[i].defeated = false
-        end
+    -- Show success message unless silent
+    if not silent then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("TIMER_RESET"), 1, 1, 0)
     end
-    
-    -- DON'T stop world buff scanning - it runs continuously now
-    self.deathCount = 0
-    self.startTime = nil
-    -- Reset run-specific World Buff flags and lists
-    self.runWithWorldBuffs = nil
-    self.runWorldBuffPlayers = {}
-    -- hasWorldBuffs and worldBuffPlayers are managed by continuous scanning
-    
-    -- Clear Run ID
-    self:clearRunId()
-    
-    -- Clear last run from database
-    TurtleDungeonTimerDB.lastRun = {}
-    
-    -- Reset UI
-    self:resetUI()
-    
-    -- Update button text
-    self:updateStartPauseButton()
+end
+
+-- Alias for backwards compatibility
+function TurtleDungeonTimer:performResetSilent()
+    self:performResetDirect(true)
 end
 
 function TurtleDungeonTimer:updateStartPauseButton()

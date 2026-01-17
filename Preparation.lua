@@ -490,7 +490,7 @@ function TurtleDungeonTimer:checkAddonPresence()
     end
     
     -- Display results
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Addon Check]|r", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[" .. TDT_L("PREP_ADDON_CHECK") .. "]|r", 0, 1, 0)
     
     -- Show who has addon
     for playerName, _ in pairs(withAddon) do
@@ -500,26 +500,26 @@ function TurtleDungeonTimer:checkAddonPresence()
     -- Show who doesn't have addon
     local missingCount = 0
     for playerName, _ in pairs(withoutAddon) do
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffff0000✗|r " .. playerName .. " |cffff0000(fehlt)|r", 1, 0, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffff0000✗|r " .. playerName .. " |cffff0000" .. TDT_L("PREP_MISSING") .. "|r", 1, 0, 0)
         missingCount = missingCount + 1
     end
     
     if missingCount > 0 then
-        self:failPreparation("Nicht alle Gruppenmitglieder haben das Addon installiert!")
+        self:failPreparation(TDT_L("PREP_NOT_ALL_HAVE_ADDON"))
         return false
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r Alle haben das Addon", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r " .. TDT_L("PREP_ALL_HAVE_ADDON"), 0, 1, 0)
     return true
 end
 
 function TurtleDungeonTimer:checkVersionMatch()
-    -- Check if all versions match
-    local myVersion = self.SYNC_VERSION
+    -- Check if all versions match (using full ADDON_VERSION: major.minor.patch-suffix)
+    local myVersion = self.ADDON_VERSION
     local allMatch = true
     local versionMismatches = {}
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Version Check]|r", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[" .. TDT_L("PREP_VERSION_CHECK") .. "]|r", 0, 1, 0)
     
     -- Add self
     DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00✓|r " .. UnitName("player") .. " (v" .. myVersion .. ")", 0.7, 0.7, 0.7)
@@ -529,18 +529,18 @@ function TurtleDungeonTimer:checkVersionMatch()
         if version == myVersion then
             DEFAULT_CHAT_FRAME:AddMessage("  |cff00ff00✓|r " .. player .. " (v" .. version .. ")", 0.7, 0.7, 0.7)
         else
-            DEFAULT_CHAT_FRAME:AddMessage("  |cffff0000✗|r " .. player .. " (v" .. version .. ") |cffff0000(erwartet: v" .. myVersion .. ")|r", 1, 0, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("  |cffff0000✗|r " .. player .. " (v" .. version .. ") |cffff0000" .. string.format(TDT_L("PREP_EXPECTED_VERSION"), myVersion) .. "|r", 1, 0, 0)
             allMatch = false
             table.insert(versionMismatches, player)
         end
     end
     
     if not allMatch then
-        self:failPreparation("Version mismatch! Nicht alle haben die gleiche Version.")
+        self:failPreparation(TDT_L("PREP_VERSION_MISMATCH"))
         return false
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r Alle haben die gleiche Version", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r " .. TDT_L("PREP_ALL_SAME_VERSION"), 0, 1, 0)
     return true
 end
 
@@ -557,8 +557,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    -- ResetInstances()
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[TESTING]|r " .. TDT_L("PREP_RESET_SKIPPED_LIMIT"), 1, 0.6, 0)
+    ResetInstances()
     
     -- Wait a moment for system message (or just simulate success)
     self:scheduleTimer(function()
@@ -639,7 +638,7 @@ function TurtleDungeonTimer:startReadyCheck()
     
     -- Auto-respond for self (leader) - leader is always ready
     self.readyCheckResponses[UnitName("player")] = true
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Ready Check]|r Du (Leader) bist automatisch ready", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Ready Check]|r " .. TDT_L("PREP_LEADER_AUTO_READY"), 0, 1, 0)
     
     -- DON'T show ready check prompt for leader - they started it, so they're ready
     -- Check if all members have already responded (solo case)
@@ -858,7 +857,7 @@ function TurtleDungeonTimer:checkReadyCheckComplete()
     
     -- If all have responded, finish immediately
     if responseCount >= expectedCount then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Alle haben geantwortet!", 0, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_ALL_RESPONDED"), 0, 1, 0)
         self:finishReadyCheck()
     end
 end
@@ -868,7 +867,7 @@ function TurtleDungeonTimer:finishReadyCheck()
         return
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Ready Check Ergebnisse]|r", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[" .. TDT_L("PREP_READY_CHECK_RESULTS") .. "]|r", 0, 1, 0)
     
     local allReady = true
     local notReadyPlayers = {}
@@ -882,7 +881,7 @@ function TurtleDungeonTimer:finishReadyCheck()
         allReady = false
         table.insert(notReadyPlayers, UnitName("player"))
     else
-        DEFAULT_CHAT_FRAME:AddMessage("  |cffff9900?|r " .. UnitName("player") .. " (Keine Antwort)", 1, 0.6, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("  |cffff9900?|r " .. UnitName("player") .. " " .. TDT_L("PREP_NO_RESPONSE"), 1, 0.6, 0)
         allReady = false
         table.insert(notReadyPlayers, UnitName("player"))
     end
@@ -897,14 +896,14 @@ function TurtleDungeonTimer:finishReadyCheck()
             allReady = false
             table.insert(notReadyPlayers, player)
         else
-            DEFAULT_CHAT_FRAME:AddMessage("  |cffff9900?|r " .. player .. " (Keine Antwort)", 1, 0.6, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("  |cffff9900?|r " .. player .. " " .. TDT_L("PREP_NO_RESPONSE"), 1, 0.6, 0)
             allReady = false
             table.insert(notReadyPlayers, player)
         end
     end
     
     if allReady then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r Alle sind ready!", 0, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[✓]|r " .. TDT_L("PREP_ALL_READY"), 0, 1, 0)
         
         -- Remove world buffs if "Without World Buffs" was selected
         if not self.runWithWorldBuffs then
@@ -953,14 +952,14 @@ function TurtleDungeonTimer:finishReadyCheck()
     else
         -- Preparation failed
         self.preparationState = "FAILED"
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[✗] Vorbereitung fehlgeschlagen:|r Nicht alle sind ready! Bereite dich vor und versuche es erneut.", 1, 0, 0)
-        self:broadcastPreparationFailed("Nicht alle sind ready!")
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[✗] " .. TDT_L("PREP_FAILED") .. "|r " .. TDT_L("PREP_NOT_ALL_READY"), 1, 0, 0)
+        self:broadcastPreparationFailed(TDT_L("PREP_NOT_ALL_READY"))
     end
 end
 
 function TurtleDungeonTimer:failPreparation(reason)
     self.preparationState = "FAILED"
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[✗] Vorbereitung fehlgeschlagen:|r " .. reason, 1, 0, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[✗] " .. TDT_L("PREP_FAILED") .. "|r " .. reason, 1, 0, 0)
     self:broadcastPreparationFailed(reason)
 end
 
@@ -1051,7 +1050,7 @@ function TurtleDungeonTimer:startCountdown(triggeredBy)
     -- Update button to show "Abort" since countdown started
     self:updateStartButton()
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. triggeredBy .. " hat die Instanz betreten! Countdown startet in 10 Sekunden...", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. string.format(TDT_L("PREP_ENTERED_COUNTDOWN"), triggeredBy), 0, 1, 0)
     
     self:showCountdownFrame()
     self:updateCountdownTick()
@@ -1103,7 +1102,7 @@ function TurtleDungeonTimer:cancelCountdown()
     self.countdownTriggered = false
     self:hideCountdownFrame()
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r Countdown abgebrochen - Timer gestartet!", 1, 0.6, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r " .. TDT_L("PREP_COUNTDOWN_CANCELLED"), 1, 0.6, 0)
 end
 
 function TurtleDungeonTimer:updateCountdownTick()
@@ -1153,7 +1152,7 @@ function TurtleDungeonTimer:finishCountdown()
         self.countdownFrame.number:SetTextColor(0, 1, 0)
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Run gestartet! Viel Erfolg!", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_STARTED"), 0, 1, 0)
     
     -- Hide after 2 seconds
     self:scheduleTimer(function()
@@ -1308,7 +1307,7 @@ function TurtleDungeonTimer:onSyncCountdownStart(triggeredBy, sender)
 end
 
 function TurtleDungeonTimer:onSyncPreparationFailed(reason, sender)
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Vorbereitung fehlgeschlagen: " .. reason, 1, 0, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. string.format(TDT_L("PREP_FAILED_REASON"), reason), 1, 0, 0)
     self.preparationState = "FAILED"
 end
 
