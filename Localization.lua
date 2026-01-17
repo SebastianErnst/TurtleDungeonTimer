@@ -149,9 +149,15 @@ translations.enUS = {
     ["UI_NEW_DUNGEON_MESSAGE"] = "You are entering %s.\\n\\nReset current run?",
     ["UI_EXPORT_TITLE"] = "Export Run Data",
     ["UI_EXPORT_DESCRIPTION"] = "Export string is also printed in chat for easy copying.",    
+    ["UI_ABORT_RUN_TITLE"] = "Abort Run?",
     ["UI_ABORT_RUN_MESSAGE"] = "Do you want to abort the current run?",
     ["UI_ABORT_VOTE_MESSAGE"] = "%s wants to abort the run.",
-    ["UI_ABORT_VOTE_QUESTION"] = "Do you agree?",    
+    ["UI_ABORT_VOTE_QUESTION"] = "Do you agree?",
+    ["UI_ABORT_REQUEST_SENT"] = "You have submitted an abort request",
+    ["UI_ABORT_BY_GROUP"] = "Run was aborted (group decision)",
+    ["UI_ABORT_DECLINED"] = "Abort was declined",
+    ["UI_ABORT_VOTE_STATUS"] = "Abort Vote: %d/%d (YES: %d)",
+    ["UI_ABORT_BY_GROUP_SYNC"] = "Run was aborted by the group",
     
     -- Debug Messages (keep in English for consistency)
     ["DEBUG_PREFIX"] = "[Debug]",
@@ -325,9 +331,15 @@ translations.deDE = {
     ["UI_NEW_DUNGEON_MESSAGE"] = "Du betrittst %s.\\n\\nAktuellen Run resetten?",
     ["UI_EXPORT_TITLE"] = "Run-Daten exportieren",
     ["UI_EXPORT_DESCRIPTION"] = "Export-String wird auch im Chat ausgegeben zum einfachen Kopieren.",    
+    ["UI_ABORT_RUN_TITLE"] = "Run abbrechen?",
     ["UI_ABORT_RUN_MESSAGE"] = "Möchten Sie den aktuellen Run abbrechen?",
     ["UI_ABORT_VOTE_MESSAGE"] = "%s möchte den Run abbrechen.",
-    ["UI_ABORT_VOTE_QUESTION"] = "Stimmen Sie zu?",    
+    ["UI_ABORT_VOTE_QUESTION"] = "Stimmen Sie zu?",
+    ["UI_ABORT_REQUEST_SENT"] = "Du hast eine Abbruch-Anfrage gestellt",
+    ["UI_ABORT_BY_GROUP"] = "Run wurde abgebrochen (Gruppenbeschluss)",
+    ["UI_ABORT_DECLINED"] = "Abbruch wurde abgelehnt",
+    ["UI_ABORT_VOTE_STATUS"] = "Abbruch Vote: %d/%d (JA: %d)",
+    ["UI_ABORT_BY_GROUP_SYNC"] = "Run wurde von der Gruppe abgebrochen",
     
     -- Debug Messages (keep in English for consistency)
     ["DEBUG_PREFIX"] = "[Debug]",

@@ -20,7 +20,11 @@ function TurtleDungeonTimer:registerEvents()
                 -- Player entered combat - broadcast to group
                 timer:broadcastCombatStart()
             elseif event == "PLAYER_ENTERING_WORLD" then
-                -- Player entered world (login/reload/zone) - request current run data after delay
+                -- Player entered world (login/reload/zone)
+                -- Set grace period to prevent false group-change aborts
+                timer.loginGracePeriodEnd = GetTime() + timer.LOGIN_GRACE_PERIOD
+                
+                -- Request current run data after delay
                 timer:scheduleTimer(function()
                     TurtleDungeonTimer:getInstance():requestCurrentRunData()
                 end, 2.0, false)

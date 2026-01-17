@@ -6,6 +6,8 @@
 TurtleDungeonTimer.SYNC_PREFIX = "TDT_SYNC"
 TurtleDungeonTimer.SYNC_INTERVAL = 10  -- Periodic sync interval in seconds (configurable for testing)
 TurtleDungeonTimer.GROUP_CHECK_DEBOUNCE = 2.0  -- Debounce group change checks (seconds)
+TurtleDungeonTimer.LOGIN_GRACE_PERIOD = 8.0  -- Grace period after login/reload to prevent false group-change aborts (seconds)
+TurtleDungeonTimer.loginGracePeriodEnd = 0  -- Timestamp when grace period ends
 TurtleDungeonTimer.playersWithAddon = {}
 TurtleDungeonTimer.resetVotes = {}
 TurtleDungeonTimer.resetInitiator = nil
@@ -127,11 +129,22 @@ function TurtleDungeonTimer:syncFrameOnEvent()
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Real group change detected!", 1, 0.5, 0)
         end
         
-        -- Abort active run if group composition changed
-        if instance.isRunning or instance.isCountingDown then
-            instance:sendSyncMessage("ABORT_GROUP_CHANGE")
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
-            instance:abortRun()
+        -- Check if we're in grace period after login/reload
+        local inGracePeriod = (now < instance.loginGracePeriodEnd)
+        
+        if inGracePeriod then
+            if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+                local remaining = instance.loginGracePeriodEnd - now
+                DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFFFF00FF[TDT Debug]|r In grace period (%.1fs remaining), ignoring group change", remaining), 1, 1, 0)
+            end
+            -- Don't abort, just update UI
+        else
+            -- Abort active run if group composition changed (outside grace period)
+            if instance.isRunning or instance.isCountingDown then
+                instance:sendSyncMessage("ABORT_GROUP_CHANGE")
+                DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
+                instance:abortRun()
+            end
         end
         
         -- Update addon user list and UI
@@ -489,7 +502,7 @@ function TurtleDungeonTimer:startAbortVote()
     self.abortInitiator = UnitName("player")
     self.abortVotes[UnitName("player")] = true
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Du hast eine Abbruch-Anfrage gestellt", 1, 1, 0)
+    TDT_Print("UI_ABORT_REQUEST_SENT", "success")
 end
 
 function TurtleDungeonTimer:voteAbort(vote)
@@ -530,15 +543,15 @@ function TurtleDungeonTimer:checkAbortVotes()
             self:abortRun()
             self.abortVotes = {}
             self.abortInitiator = nil
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Run wurde abgebrochen (Gruppenbeschluss)", 1, 1, 0)
+            TDT_Print("UI_ABORT_BY_GROUP", "success")
         else
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Abbruch wurde abgelehnt", 1, 0, 0)
+            TDT_Print("UI_ABORT_DECLINED", "error")
             self:sendSyncMessage("ABORT_CANCEL")
             self.abortVotes = {}
             self.abortInitiator = nil
         end
     else
-        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00ff00[Turtle Dungeon Timer]|r Abbruch Vote: %d/%d (JA: %d)", votedMembers, totalAddonUsers, yesVotes), 1, 1, 0)
+        TDT_Print("UI_ABORT_VOTE_STATUS", "success", votedMembers, totalAddonUsers, yesVotes)
     end
 end
 
@@ -588,7 +601,7 @@ function TurtleDungeonTimer:onSyncAbortExecute(sender)
         self.abortVoteDialog:Hide()
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Run wurde von der Gruppe abgebrochen", 1, 1, 0)
+    TDT_Print("UI_ABORT_BY_GROUP_SYNC", "success")
 end
 
 function TurtleDungeonTimer:onSyncAbortGroupChange(sender)
@@ -697,7 +710,7 @@ function TurtleDungeonTimer:showAbortConfirmationDialog()
     
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", dialog, "TOP", 0, -15)
-    title:SetText("Run abbrechen?")
+    title:SetText(TDT_L("UI_ABORT_RUN_TITLE"))
     title:SetTextColor(1, 0.82, 0)
     
     local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
