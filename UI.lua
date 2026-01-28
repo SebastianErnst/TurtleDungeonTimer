@@ -188,13 +188,17 @@ function TurtleDungeonTimer:selectVariant(variantName)
 
     -- Build boss list with proper structure
     self.bossList = {}
+    self.bossLookup = {}  -- Performance: O(1) lookup table
     if variantData.bosses then
         for i = 1, table.getn(variantData.bosses) do
+            local bossName = variantData.bosses[i]
             table.insert(self.bossList, {
-                name = variantData.bosses[i],
+                name = bossName,
                 defeated = false,
                 optional = false
             })
+            -- Build O(1) lookup: bossName -> index
+            self.bossLookup[bossName] = i
         end
     end
 
@@ -248,6 +252,7 @@ function TurtleDungeonTimer:createUI()
 
     -- Make movable
     self.frame:SetMovable(true)
+    self.frame:SetClampedToScreen(true)
     self.frame:EnableMouse(true)
     self.frame:RegisterForDrag("LeftButton")
     self.frame:SetScript("OnDragStart", function() this:StartMoving() end)
@@ -507,17 +512,9 @@ function TurtleDungeonTimer:createProgressBar()
         TurtleDungeonTimer:getInstance():toggleBossList()
     end)
     self.frame.toggleButton = toggleBtn
-
-    -- Add OnUpdate handler for automatic UI refresh
-    self.frame:SetScript("OnUpdate", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        if arg1 then -- arg1 = elapsed time
-            -- Update UI every frame while timer is running
-            if timer.isRunning then
-                timer:updateUI()
-            end
-        end
-    end)
+    
+    -- Performance: OnUpdate removed - timer updates are handled in Timer.lua:setupUpdateLoop()
+    -- with proper throttling (0.1s instead of every frame = 60x less CPU usage)
 end
 
 -- ============================================================================
@@ -770,22 +767,25 @@ end
 function TurtleDungeonTimer:updateTimerDisplay()
     if not self.frame or not self.frame.timerText then return end
 
-    local timeStr = "00:00"
+    local elapsed = 0
     if self.isRunning and self.startTime then
-        local elapsed = GetTime() - self.startTime
-        local minutes = math.floor(elapsed / 60)
-        local seconds = elapsed - (minutes * 60)
-        timeStr = string.format("%02d:%02d", minutes, seconds)
+        elapsed = GetTime() - self.startTime
     elseif table.getn(self.killTimes) > 0 then
         local lastKillTime = self.killTimes[table.getn(self.killTimes)]
         if lastKillTime and lastKillTime.time then
-            local minutes = math.floor(lastKillTime.time / 60)
-            local seconds = lastKillTime.time - (minutes * 60)
-            timeStr = string.format("%02d:%02d", minutes, seconds)
+            elapsed = lastKillTime.time
         end
     end
-
-    self.frame.timerText:SetText(timeStr)
+    
+    -- Performance: Only format string if time changed (cache check)
+    local elapsedInt = math.floor(elapsed)
+    if self.lastDisplayedTime ~= elapsedInt then
+        self.lastDisplayedTime = elapsedInt
+        local minutes = math.floor(elapsed / 60)
+        local seconds = elapsed - (minutes * 60)
+        local timeStr = string.format("%02d:%02d", minutes, seconds)
+        self.frame.timerText:SetText(timeStr)
+    end
 end
 
 function TurtleDungeonTimer:updateProgressBar()
@@ -793,12 +793,17 @@ function TurtleDungeonTimer:updateProgressBar()
 
     local progress = TDTTrashCounter:getProgress()
     
+    -- Performance: Only update if progress changed (cache check)
+    local progressRounded = math.floor(progress * 100) / 100  -- Round to 2 decimals
+    if self.lastDisplayedProgress == progressRounded then return end
+    self.lastDisplayedProgress = progressRounded
+    
     -- Cap bar width at 100%
     local cappedProgress = math.min(progress, 100)
     local width = 218 * (cappedProgress / 100)
     self.frame.progressBar:SetWidth(math.max(1, width))
     
-    -- Show "100% (+x%)" if over 100%
+    -- Update progress text (shows actual progress, can exceed 100%)
     local textString
     if progress > 100 then
         local overage = progress - 100
@@ -818,6 +823,10 @@ end
 
 function TurtleDungeonTimer:updateDeathCount()
     if not self.frame or not self.frame.deathText then return end
+
+    -- Performance: Only update if death count changed (cache check)
+    if self.lastDisplayedDeaths == self.deathCount then return end
+    self.lastDisplayedDeaths = self.deathCount
 
     self.frame.deathText:SetText("" .. self.deathCount)
     
@@ -1080,6 +1089,7 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
     detailFrame:SetFrameStrata("DIALOG")
     detailFrame:EnableMouse(true)
     detailFrame:SetMovable(true)
+    detailFrame:SetClampedToScreen(true)
     detailFrame:RegisterForDrag("LeftButton")
     detailFrame:SetScript("OnDragStart", function() this:StartMoving() end)
     detailFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
@@ -1290,6 +1300,36 @@ function TurtleDungeonTimer:showHistoryExportDialog(entry)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r No data to export.", 1, 0.5, 0)
         return
     end
+    
+    -- Calculate progress percentage for this entry
+    local progressText = "N/A"
+    if entry.trashProgress then
+        local progress = entry.trashProgress
+        if progress > 100 then
+            local overage = progress - 100
+            progressText = string.format("100%% (+%.2f%%)", overage)
+        else
+            progressText = string.format("%.2f%%", progress)
+        end
+    end
+    
+    -- Print to chat with dungeon, time, and percentage
+    local totalTime = 0
+    if entry.killTimes and table.getn(entry.killTimes) > 0 then
+        totalTime = entry.killTimes[table.getn(entry.killTimes)].time
+    end
+    local minutes = math.floor(totalTime / 60)
+    local seconds = totalTime - (minutes * 60)
+    local timeStr = string.format("%02d:%02d", minutes, seconds)
+    
+    local dungeonName = entry.dungeon or "Unknown"
+    local variantName = entry.variant or "Default"
+    
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Export String:", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffffffffDungeon:|r " .. dungeonName .. " (" .. variantName .. ")", 1, 1, 1)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffffffffTime:|r " .. timeStr .. " |cffffffffTrash:|r " .. progressText, 1, 1, 1)
+    DEFAULT_CHAT_FRAME:AddMessage(exportString)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Tip:|r Click and drag to select the string above, then right-click to copy.")
     
     -- Create or show existing dialog
     if self.historyExportDialog then

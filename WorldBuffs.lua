@@ -38,7 +38,7 @@ function TurtleDungeonTimer:removeAllWorldBuffs()
         -- Also remove our own buffs
         self:removeOwnWorldBuffs()
         
-        TDT_Print("WB_REMOVAL_SENT", "warning")
+        -- Silent - no output
     else
         -- Only leaders can initiate group-wide removal
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_REMOVE_WB"), 1, 0, 0)
@@ -90,10 +90,13 @@ function TurtleDungeonTimer:removeWorldBuffsFromUnit(unit)
         end
     end
     
-    if removedCount > 0 then
-        TDT_Print("WB_REMOVED_COUNT", "warning", removedCount)
-    elseif TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug] No world buffs found to remove", 0, 1, 1)
+    -- Silent - no output
+    if TurtleDungeonTimerDB.debug then
+        if removedCount > 0 then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug] Removed " .. removedCount .. " world buffs", 0, 1, 1)
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug] No world buffs found to remove", 0, 1, 1)
+        end
     end
 end
 

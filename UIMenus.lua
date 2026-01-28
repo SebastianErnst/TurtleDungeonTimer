@@ -257,16 +257,25 @@ function TurtleDungeonTimer:showInstanceListDirect(parentBtn, isDungeonFilter)
         self.frame.variantSubmenu = nil
     end
     
-    -- Build list of instances matching the filter
-    local menu = {}
-    for instanceName, instanceData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
-        if instanceData.isDungeon == isDungeonFilter or instanceData.isRaid == (not isDungeonFilter) then
-            local displayName = instanceData.displayName or instanceName
-            table.insert(menu, {text = displayName, key = instanceName})
-        end
-    end
+    -- Performance: Use cached menu if available
+    local cacheKey = isDungeonFilter and "cachedDungeonMenu" or "cachedRaidMenu"
+    local menu = self[cacheKey]
     
-    table.sort(menu, function(a, b) return a.text < b.text end)
+    if not menu then
+        -- Build list of instances matching the filter (only once!)
+        menu = {}
+        for instanceName, instanceData in pairs(TurtleDungeonTimer.DUNGEON_DATA) do
+            if instanceData.isDungeon == isDungeonFilter or instanceData.isRaid == (not isDungeonFilter) then
+                local displayName = instanceData.displayName or instanceName
+                table.insert(menu, {text = displayName, key = instanceName})
+            end
+        end
+        
+        table.sort(menu, function(a, b) return a.text < b.text end)
+        
+        -- Cache for future use
+        self[cacheKey] = menu
+    end
     
     local btnHeight = 20
     local numItems = table.getn(menu)

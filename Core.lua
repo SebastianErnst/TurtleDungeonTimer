@@ -14,7 +14,7 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- z = Build number (0-9999, increment on every change)
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
 -- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "0.14.4"
+TurtleDungeonTimer.ADDON_VERSION = "0.14.6"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil
@@ -51,12 +51,22 @@ function TurtleDungeonTimer:new()
     self.selectedDungeon = nil
     self.selectedVariant = nil
     self.bossList = {}
+    self.bossLookup = {} -- Performance: O(1) boss name lookup instead of O(n) iteration
     self.optionalBosses = {} -- Table of optional boss names
     self.killTimes = {}
     self.deathCount = 0
     self.bossListExpanded = true
     self.minimized = false
     self.initialized = false
+    
+    -- UI update cache (performance optimization)
+    self.lastDisplayedTime = nil
+    self.lastDisplayedDeaths = nil
+    self.lastDisplayedProgress = nil
+    
+    -- Dungeon menu cache (performance: build once instead of every time menu opens)
+    self.cachedDungeonMenu = nil
+    self.cachedRaidMenu = nil
     
     -- World buff tracking
     self.hasWorldBuffs = false

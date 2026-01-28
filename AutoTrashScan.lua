@@ -147,7 +147,7 @@ function TDTAutoTrashScan:onEnterCombat()
     
     -- Check if dungeon is selected
     local timer = TurtleDungeonTimer:getInstance()
-    if not timer or not timer.selectedDungeon then
+    if not timer or not timer.selectedDungeon or not timer.selectedVariant then
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r No dungeon selected!", 1, 0.5, 0)
         return
     end
@@ -167,7 +167,7 @@ function TDTAutoTrashScan:onEnterCombat()
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Auto Scan]|r Pull scan started - tab through mobs to mark them!", 0, 1, 0)
     
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FFFF[TDT Auto Scan Debug]|r Dungeon: " .. timer.selectedDungeon, 0, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FFFF[TDT Auto Scan Debug]|r Dungeon: " .. timer.selectedDungeon .. " (" .. timer.selectedVariant .. ")", 0, 1, 1)
     end
 end
 
@@ -585,16 +585,20 @@ function TDTAutoTrashScan:saveToDatabase(cleanedData)
     
     local timer = TurtleDungeonTimer:getInstance()
     local currentDungeon = timer.selectedDungeon
-    if not currentDungeon then
+    local currentVariant = timer.selectedVariant
+    if not currentDungeon or not currentVariant then
         return
     end
     
+    -- Use combined key: "Dungeon:Variant" for storage
+    local storageKey = currentDungeon .. ":" .. currentVariant
+    
     -- Initialize dungeon storage
-    if not TurtleDungeonTimerDB.autoScannedTrash[currentDungeon] then
-        TurtleDungeonTimerDB.autoScannedTrash[currentDungeon] = {}
+    if not TurtleDungeonTimerDB.autoScannedTrash[storageKey] then
+        TurtleDungeonTimerDB.autoScannedTrash[storageKey] = {}
     end
     
-    local saved = TurtleDungeonTimerDB.autoScannedTrash[currentDungeon]
+    local saved = TurtleDungeonTimerDB.autoScannedTrash[storageKey]
     local newMobs = 0
     local updatedMobs = 0
     
@@ -653,15 +657,18 @@ end
 function TDTAutoTrashScan:clearCurrentDungeon()
     local timer = TurtleDungeonTimer:getInstance()
     local currentDungeon = timer.selectedDungeon
-    if not currentDungeon then
+    local currentVariant = timer.selectedVariant
+    if not currentDungeon or not currentVariant then
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Auto Scan]|r No dungeon selected!", 1, 0, 0)
         return
     end
     
-    if TurtleDungeonTimerDB.autoScannedTrash[currentDungeon] then
-        local count = table.getn(TurtleDungeonTimerDB.autoScannedTrash[currentDungeon])
-        TurtleDungeonTimerDB.autoScannedTrash[currentDungeon] = {}
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[TDT Auto Scan]|r Cleared " .. count .. " mobs for " .. currentDungeon, 1, 0.8, 0)
+    local storageKey = currentDungeon .. ":" .. currentVariant
+    
+    if TurtleDungeonTimerDB.autoScannedTrash[storageKey] then
+        local count = table.getn(TurtleDungeonTimerDB.autoScannedTrash[storageKey])
+        TurtleDungeonTimerDB.autoScannedTrash[storageKey] = {}
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff8800[TDT Auto Scan]|r Cleared " .. count .. " mobs for " .. currentDungeon .. " (" .. currentVariant .. ")", 1, 0.8, 0)
         
         if self.listFrame and self.listFrame:IsShown() then
             self:refreshListWindow()
@@ -970,23 +977,27 @@ function TDTAutoTrashScan:refreshListWindow()
     end
     scrollChild.activeRows = {}
     
-    -- Get current dungeon
+    -- Get current dungeon and variant
     local timer = TurtleDungeonTimer:getInstance()
     local currentDungeon = timer.selectedDungeon
-    if not currentDungeon then
+    local currentVariant = timer.selectedVariant
+    if not currentDungeon or not currentVariant then
         self.listFrame.dungeonLabel:SetText("No dungeon selected")
         return
     end
     
-    self.listFrame.dungeonLabel:SetText(currentDungeon)
+    self.listFrame.dungeonLabel:SetText(currentDungeon .. " (" .. currentVariant .. ")")
     
-    -- Get mobs for this dungeon
-    if not TurtleDungeonTimerDB.autoScannedTrash or not TurtleDungeonTimerDB.autoScannedTrash[currentDungeon] then
+    -- Use combined key for storage lookup
+    local storageKey = currentDungeon .. ":" .. currentVariant
+    
+    -- Get mobs for this dungeon+variant
+    if not TurtleDungeonTimerDB.autoScannedTrash or not TurtleDungeonTimerDB.autoScannedTrash[storageKey] then
         scrollChild:SetHeight(1)
         return
     end
     
-    local mobs = TurtleDungeonTimerDB.autoScannedTrash[currentDungeon]
+    local mobs = TurtleDungeonTimerDB.autoScannedTrash[storageKey]
     if table.getn(mobs) == 0 then
         scrollChild:SetHeight(1)
         return
@@ -1033,12 +1044,16 @@ function TDTAutoTrashScan:refreshListWindow()
         row.deleteBtn:SetScript("OnClick", function()
             local timer = TurtleDungeonTimer:getInstance()
             local currentDungeon = timer.selectedDungeon
-            if currentDungeon and TurtleDungeonTimerDB.autoScannedTrash[currentDungeon] then
-                for idx, m in ipairs(TurtleDungeonTimerDB.autoScannedTrash[currentDungeon]) do
-                    if m.name == mobName and m.hp == mobHP then
-                        table.remove(TurtleDungeonTimerDB.autoScannedTrash[currentDungeon], idx)
-                        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Auto Scan]|r Deleted: " .. mobName .. " (" .. mobHP .. " HP)", 1, 0, 0)
-                        break
+            local currentVariant = timer.selectedVariant
+            if currentDungeon and currentVariant then
+                local storageKey = currentDungeon .. ":" .. currentVariant
+                if TurtleDungeonTimerDB.autoScannedTrash[storageKey] then
+                    for idx, m in ipairs(TurtleDungeonTimerDB.autoScannedTrash[storageKey]) do
+                        if m.name == mobName and m.hp == mobHP then
+                            table.remove(TurtleDungeonTimerDB.autoScannedTrash[storageKey], idx)
+                            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT Auto Scan]|r Deleted: " .. mobName .. " (" .. mobHP .. " HP)", 1, 0, 0)
+                            break
+                        end
                     end
                 end
             end

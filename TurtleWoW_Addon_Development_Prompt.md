@@ -933,6 +933,179 @@ end
 **Best Practice:**
 Always validate that cached UI elements have their expected methods (e.g., `SetText`) before using them!
 
+### Performance Optimization Patterns (CRITICAL!)
+
+**⚠️ COMMON PERFORMANCE ISSUES:** WoW 1.12 is very sensitive to inefficient code. Always optimize hot paths!
+
+#### 1. OnUpdate Throttling
+
+```lua
+-- ❌ WRONG - Updates every frame (60+ FPS = massive CPU waste)
+frame:SetScript("OnUpdate", function()
+    updateUI()  -- Called 60+ times per second!
+end)
+
+-- ✅ CORRECT - Throttle to reasonable rate
+frame:SetScript("OnUpdate", function()
+    local now = GetTime()
+    if now - this.lastUpdate >= 0.1 then  -- Max 10 updates/sec
+        this.lastUpdate = now
+        updateUI()
+    end
+end)
+```
+
+**Rule:** OnUpdate should NEVER call expensive functions every frame. Always throttle!
+
+#### 2. String Formatting Cache
+
+```lua
+-- ❌ WRONG - Formats string every frame even if unchanged
+function updateTimer()
+    local timeStr = string.format("%02d:%02d", mins, secs)
+    frame.text:SetText(timeStr)  -- Called 60+ times/sec!
+end
+
+-- ✅ CORRECT - Cache and only update when changed
+function updateTimer()
+    local currentTime = mins * 60 + secs
+    if self.lastDisplayedTime ~= currentTime then
+        self.lastDisplayedTime = currentTime
+        local timeStr = string.format("%02d:%02d", mins, secs)
+        frame.text:SetText(timeStr)
+    end
+end
+```
+
+**Why:** `string.format()` is expensive in Lua 5.1. Cache results and early-exit if unchanged!
+
+#### 3. O(1) Lookups Instead of O(n) Iteration
+
+```lua
+-- ❌ WRONG - Linear search in hot path (e.g., every mob kill)
+function onMobKilled(name)
+    for i = 1, table.getn(bossList) do
+        if bossList[i] == name then  -- O(n) search!
+            -- Do something
+        end
+    end
+end
+
+-- ✅ CORRECT - Build lookup table once, use O(1) access
+-- During initialization:
+self.bossLookup = {}
+for i, boss in ipairs(bossList) do
+    self.bossLookup[boss.name] = i  -- name -> index
+end
+
+-- In hot path:
+function onMobKilled(name)
+    local index = self.bossLookup[name]  -- O(1) lookup!
+    if index then
+        -- Do something
+    end
+end
+```
+
+**Rule:** Never iterate arrays in frequently-called code. Build lookup tables!
+
+#### 4. UI Update Early Exit
+
+```lua
+-- ❌ WRONG - Always updates UI even if nothing changed
+function updateProgressBar()
+    local progress = calculateProgress()
+    bar:SetWidth(progress * 200)
+    text:SetText(string.format("%.2f%%", progress))
+end
+
+-- ✅ CORRECT - Early exit if unchanged
+function updateProgressBar()
+    local progress = calculateProgress()
+    local rounded = math.floor(progress * 100) / 100
+    
+    if self.lastProgress == rounded then return end  -- Early exit!
+    self.lastProgress = rounded
+    
+    bar:SetWidth(progress * 200)
+    text:SetText(string.format("%.2f%%", progress))
+end
+```
+
+**Rule:** Always check if update is needed before expensive UI operations!
+
+#### 5. Pre-compute and Cache
+
+```lua
+-- ❌ WRONG - Builds and sorts menu every time it opens
+function showMenu()
+    local items = {}
+    for name, data in pairs(DUNGEON_DATA) do
+        table.insert(items, name)
+    end
+    table.sort(items)  -- Expensive!
+    -- Create UI...
+end
+
+-- ✅ CORRECT - Build once, cache forever
+-- During addon load:
+self.cachedDungeonMenu = buildSortedDungeonList()
+
+-- When showing:
+function showMenu()
+    local items = self.cachedDungeonMenu  -- Use cache!
+    -- Create UI...
+end
+```
+
+**Rule:** Pre-compute static data at load time, not at runtime!
+
+#### 6. Batch Similar Operations
+
+```lua
+-- ❌ WRONG - Multiple addon messages in quick succession
+self:sendSyncMessage("BOSS1")
+self:sendSyncMessage("BOSS2")
+self:sendSyncMessage("BOSS3")
+
+-- ✅ CORRECT - Batch into single message
+self:sendSyncMessage("BOSSES:Boss1,Boss2,Boss3")
+```
+
+**Rule:** Minimize addon channel traffic - batch related updates!
+
+#### 7. Avoid Redundant OnUpdate Handlers
+
+```lua
+-- ❌ WRONG - Multiple OnUpdate handlers doing similar work
+frame1:SetScript("OnUpdate", function() updateTimer() end)
+frame2:SetScript("OnUpdate", function() updateUI() end)
+
+-- ✅ CORRECT - Single throttled handler
+timerFrame:SetScript("OnUpdate", function()
+    if now - lastUpdate >= 0.1 then
+        lastUpdate = now
+        updateTimer()
+        updateUI()
+    end
+end)
+```
+
+**Rule:** Consolidate OnUpdate handlers to minimize overhead!
+
+### Performance Checklist
+
+Before committing code, check:
+- [ ] No OnUpdate without throttling (min 0.1s intervals)
+- [ ] String formatting only when value changes
+- [ ] No O(n) loops in event handlers (use lookups)
+- [ ] UI updates have early-exit checks
+- [ ] Static data pre-computed and cached
+- [ ] No redundant frame/string operations
+- [ ] Addon messages batched when possible
+
+---
+
 ### Delayed/Scheduled Execution
 
 ```lua

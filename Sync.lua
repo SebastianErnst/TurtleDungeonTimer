@@ -9,6 +9,7 @@ TurtleDungeonTimer.GROUP_CHECK_DEBOUNCE = 2.0  -- Debounce group change checks (
 TurtleDungeonTimer.LOGIN_GRACE_PERIOD = 8.0  -- Grace period after login/reload to prevent false group-change aborts (seconds)
 TurtleDungeonTimer.loginGracePeriodEnd = 0  -- Timestamp when grace period ends
 TurtleDungeonTimer.playersWithAddon = {}
+TurtleDungeonTimer.cachedAddonUserCount = nil  -- Performance: Cache addon user count
 TurtleDungeonTimer.resetVotes = {}
 TurtleDungeonTimer.resetInitiator = nil
 TurtleDungeonTimer.resetVoteDialog = nil
@@ -34,6 +35,7 @@ end
 -- ============================================================================
 function TurtleDungeonTimer:checkForAddons()
     self.playersWithAddon = {}
+    self.cachedAddonUserCount = nil  -- Invalidate cache
     
     if GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 then
         return
@@ -44,6 +46,7 @@ end
 
 function TurtleDungeonTimer:onAddonCheckResponse(sender, version)
     self.playersWithAddon[sender] = true
+    self.cachedAddonUserCount = nil  -- Invalidate cache
     
     -- Store version for preparation checks
     if not self.preparationChecks then
@@ -51,18 +54,22 @@ function TurtleDungeonTimer:onAddonCheckResponse(sender, version)
     end
     self.preparationChecks[sender] = version or self.ADDON_VERSION
     
-    -- Check major version compatibility
-    if version and not self:isVersionCompatible(version) then
+    -- Check version compatibility (only warn if versions differ)
+    if version and version ~= self.ADDON_VERSION then
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. string.format(TDT_L("SYNC_VERSION_WARNING"), sender, version), 1, 0.5, 0)
     end
 end
 
 function TurtleDungeonTimer:getAddonUserCount()
-    local count = 0
-    for _ in pairs(self.playersWithAddon) do
-        count = count + 1
+    -- Performance: Cache the count, only recalculate when invalidated
+    if not self.cachedAddonUserCount then
+        local count = 0
+        for _ in pairs(self.playersWithAddon) do
+            count = count + 1
+        end
+        self.cachedAddonUserCount = count
     end
-    return count
+    return self.cachedAddonUserCount
 end
 
 function TurtleDungeonTimer:getCurrentGroupSize()
@@ -278,7 +285,7 @@ function TurtleDungeonTimer:checkResetVotes()
             self:performResetSilent()
             self.resetVotes = {}
             self.resetInitiator = nil
-            DEFAULT_CHAT_FRAME:AddMessage("||cff00ff00[Turtle Dungeon Timer]||r " .. TDT_L("SYNC_TIMER_RESET_GROUP"), 1, 1, 0)
+            TDT_Print("SYNC_TIMER_RESET_GROUP", "success")
         else
             DEFAULT_CHAT_FRAME:AddMessage("||cffff0000[Turtle Dungeon Timer]||r Reset wurde abgelehnt", 1, 0, 0)
             self:sendSyncMessage("RESET_CANCEL")
@@ -580,7 +587,7 @@ function TurtleDungeonTimer:onSyncAbortRequest(sender)
     self.abortInitiator = sender
     self.abortVotes = {}
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. sender .. " hat Run-Abbruch vorgeschlagen", 1, 1, 0)
+    TDT_Print("UI_ABORT_PROPOSED", "success", sender)
     
     if sender ~= UnitName("player") then
         self:showAbortVoteDialog(sender)
@@ -659,11 +666,29 @@ function TurtleDungeonTimer:showAbortVoteDialog(initiator)
     })
     dialog:SetFrameStrata("FULLSCREEN_DIALOG")
     dialog:EnableMouse(true)
+    dialog:SetMovable(true)
+    dialog:RegisterForDrag("LeftButton")
+    dialog:SetScript("OnDragStart", function() this:StartMoving() end)
+    dialog:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
     self.abortVoteDialog = dialog
+    
+    -- Close button (X)
+    local closeBtn = CreateFrame("Button", nil, dialog)
+    closeBtn:SetWidth(20)
+    closeBtn:SetHeight(20)
+    closeBtn:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", -5, -5)
+    closeBtn:SetNormalTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Up")
+    closeBtn:SetPushedTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Down")
+    closeBtn:SetHighlightTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Highlight")
+    closeBtn:SetScript("OnClick", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        timer:voteAbort(false)
+        dialog:Hide()
+    end)
     
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", dialog, "TOP", 0, -15)
-    title:SetText("Run abbrechen?")
+    title:SetText(TDT_L("UI_ABORT_RUN_TITLE"))
     title:SetTextColor(1, 0.82, 0)
     
     local message1 = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -728,6 +753,20 @@ function TurtleDungeonTimer:showAbortConfirmationDialog()
     })
     dialog:SetFrameStrata("FULLSCREEN_DIALOG")
     dialog:EnableMouse(true)
+    dialog:SetMovable(true)
+    dialog:RegisterForDrag("LeftButton")
+    dialog:SetScript("OnDragStart", function() this:StartMoving() end)
+    dialog:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+    
+    -- Close button (X)
+    local closeBtn = CreateFrame("Button", nil, dialog)
+    closeBtn:SetWidth(20)
+    closeBtn:SetHeight(20)
+    closeBtn:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", -5, -5)
+    closeBtn:SetNormalTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Up")
+    closeBtn:SetPushedTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Down")
+    closeBtn:SetHighlightTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Highlight")
+    closeBtn:SetScript("OnClick", function() dialog:Hide() end)
     
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", dialog, "TOP", 0, -15)
@@ -943,6 +982,20 @@ function TurtleDungeonTimer:onSyncPlayerDeath(playerName, sender)
 end
 
 -- ============================================================================
+-- PREPARE START SYNCHRONIZATION
+-- ============================================================================
+
+-- Handle PREPARE_START message from leader
+function TurtleDungeonTimer:onSyncPrepareStart(sender)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Sync]|r Received PREPARE_START from " .. sender .. ", sending addon version response", 0, 1, 0)
+    end
+    
+    -- Send our addon version back to the leader
+    self:sendSyncMessage("ADDON_CHECK_RESPONSE", self.ADDON_VERSION)
+end
+
+-- ============================================================================
 -- READY CHECK SYNCHRONIZATION
 -- ============================================================================
 
@@ -978,12 +1031,17 @@ function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
     -- Store the dungeon name from leader (for later selection when clicking Yes)
     self.pendingDungeonSelection = dungeonName
     
+    -- Reset ready check responses for new ready check
+    self.readyCheckResponses = {}
+    self.preparationState = "READY_CHECK"
+    self.readyCheckStarted = GetTime()
+    
     if TurtleDungeonTimerDB.debug then
         DEFAULT_CHAT_FRAME:AddMessage("[Debug] Parsed dungeon: " .. tostring(dungeonName) .. ", WB flag: " .. tostring(self.runWithWorldBuffs), 1, 1, 0)
     end
     
     -- Show ready check prompt to this player with the dungeon name
-    self:showReadyCheckPrompt(dungeonName)
+    self:showReadyCheckPrompt(dungeonName, sender)
 end
 
 function TurtleDungeonTimer:onSyncReadyCheckResponse(data, sender)

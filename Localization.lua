@@ -45,14 +45,10 @@ translations.enUS = {
     
     -- Preparation System
     ["PREP_ONLY_LEADER"] = "Only the group leader can prepare the run!",
+    ["PREP_LEADER_ONLY_START"] = "Only the group leader can start the run!",
     ["PREP_NO_DUNGEON"] = "No dungeon selected!",
     ["PREP_STARTING"] = "Starting run preparation for %s...",
     ["PREP_RUN_READY"] = "Run ready! You can now enter the instance.",
-    ["PREP_ALL_SAME_VERSION"] = "Everyone has the same version",
-    ["PREP_VERSION_MISMATCH"] = "Version mismatch! Not everyone has the same version.",
-    ["PREP_ALL_HAVE_ADDON"] = "Everyone has the addon",
-    ["PREP_ADDON_CHECK"] = "Addon Check",
-    ["PREP_VERSION_CHECK"] = "Version Check",
     ["PREP_RESETTING_INSTANCE"] = "Resetting instance...",
     ["PREP_INSTANCE_RESET"] = "Instance has been reset",
     ["PREP_RESET_SKIPPED"] = "Reset skipped (5/hour limit)",
@@ -68,9 +64,6 @@ translations.enUS = {
     
     -- World Buffs
     ["WORLD_BUFFS_DETECTED"] = "World Buffs detected! Run will be marked as 'With World Buffs'. (%d players)",
-    ["WB_REMOVAL_SENT"] = "World Buff removal sent to all group members.",
-    ["WB_REMOVED_COUNT"] = "%d World Buffs removed.",
-    ["WB_DETECTED_PERMANENT"] = "World Buffs detected! This run will be permanently marked as 'With World Buffs'. (%d players)",
     ["WB_DETECTED_CURRENT"] = "World Buffs detected! (%d players)",
     
     -- Sync Messages
@@ -80,6 +73,7 @@ translations.enUS = {
     ["SYNC_COUNTDOWN_INTERRUPTED"] = "Countdown was interrupted - waiting for group data...",
     ["SYNC_GROUP_IN_COUNTDOWN"] = "Group is in countdown - timer will start soon",
     ["SYNC_TIMER_CONTINUED"] = "Timer continued after reload (Offline time: %s)",
+    ["SYNC_TIMER_RESET_GROUP"] = "Timer was reset by the group",
     ["RUN_ABORTED_GROUP_CHANGE"] = "Run aborted! Group composition changed (player joined/left).",
     
     -- Boss & Run Completion
@@ -103,7 +97,6 @@ translations.enUS = {
     ["TRASH_EXPORT_INFO"] = "Export for %d dungeons with %d mobs",
     ["TRASH_COPY_TO_DATA"] = "-- Copy this data to Data.lua:",
     ["TRASH_COUNT_INCREASED_UI"] = "Count increased: %s (Count: %d)",
-    ["TRASH_EXPORT_MOBS_COUNT"] = "%s: %d mobs",
     
     -- Boss Kills
     ["BOSS_KILL_DETECTED"] = "Boss kill detected: %s",
@@ -164,6 +157,7 @@ translations.enUS = {
     ["UI_ABORT_RUN_MESSAGE"] = "Do you want to abort the current run?",
     ["UI_ABORT_VOTE_MESSAGE"] = "%s wants to abort the run.",
     ["UI_ABORT_VOTE_QUESTION"] = "Do you agree?",
+    ["UI_ABORT_PROPOSED"] = "%s has proposed to abort the run",
     ["UI_ABORT_REQUEST_SENT"] = "You have submitted an abort request",
     ["UI_ABORT_BY_GROUP"] = "Run was aborted (group decision)",
     ["UI_ABORT_DECLINED"] = "Abort was declined",
@@ -256,14 +250,10 @@ translations.deDE = {
     
     -- Preparation System
     ["PREP_ONLY_LEADER"] = "Nur der Gruppenführer kann den Run vorbereiten!",
+    ["PREP_LEADER_ONLY_START"] = "Nur der Gruppenführer kann den Run starten!",
     ["PREP_NO_DUNGEON"] = "Kein Dungeon ausgewählt!",
     ["PREP_STARTING"] = "Starte Run-Vorbereitung für %s...",
     ["PREP_RUN_READY"] = "Run bereit! Ihr könnt jetzt die Instanz betreten.",
-    ["PREP_ALL_SAME_VERSION"] = "Alle haben die gleiche Version",
-    ["PREP_VERSION_MISMATCH"] = "Version mismatch! Nicht alle haben die gleiche Version.",
-    ["PREP_ALL_HAVE_ADDON"] = "Alle haben das Addon",
-    ["PREP_ADDON_CHECK"] = "Addon Check",
-    ["PREP_VERSION_CHECK"] = "Version Check",
     ["PREP_RESETTING_INSTANCE"] = "Setze Instanz zurück...",
     ["PREP_INSTANCE_RESET"] = "Instanz wurde zurückgesetzt",
     ["PREP_RESET_SKIPPED"] = "Reset übersprungen (5/Stunde Limit)",
@@ -279,9 +269,6 @@ translations.deDE = {
     
     -- World Buffs
     ["WORLD_BUFFS_DETECTED"] = "World Buffs erkannt! Run wird als 'Mit World Buffs' markiert. (%d Spieler)",
-    ["WB_REMOVAL_SENT"] = "World Buff Entfernung an alle Gruppenmitglieder gesendet.",
-    ["WB_REMOVED_COUNT"] = "%d World Buffs entfernt.",
-    ["WB_DETECTED_PERMANENT"] = "World Buffs erkannt! Dieser Run wird dauerhaft als 'Mit World Buffs' markiert. (%d Spieler)",
     ["WB_DETECTED_CURRENT"] = "World Buffs erkannt! (%d Spieler)",
     
     -- Sync Messages
@@ -291,6 +278,8 @@ translations.deDE = {
     ["SYNC_COUNTDOWN_INTERRUPTED"] = "Countdown wurde unterbrochen - warte auf Gruppendaten...",
     ["SYNC_GROUP_IN_COUNTDOWN"] = "Gruppe ist im Countdown - Timer startet gleich",
     ["SYNC_TIMER_CONTINUED"] = "Timer nach Reload fortgesetzt (Offline Zeit: %s)",
+    ["SYNC_TIMER_RESET_GROUP"] = "Timer wurde von der Gruppe zurückgesetzt",
+    ["UI_ABORT_PROPOSED"] = "%s hat den Run-Abbruch vorgeschlagen",
     ["RUN_ABORTED_GROUP_CHANGE"] = "Run abgebrochen! Gruppenzusammensetzung hat sich geändert (Spieler beigetreten/verlassen).",
     
     -- Boss & Run Completion
@@ -314,23 +303,12 @@ translations.deDE = {
     ["TRASH_EXPORT_INFO"] = "Export für %d Dungeons mit %d Mobs",
     ["TRASH_COPY_TO_DATA"] = "-- Kopiere diese Daten in Data.lua:",
     ["TRASH_COUNT_INCREASED_UI"] = "Count erhöht: %s (Count: %d)",
-    ["TRASH_EXPORT_MOBS_COUNT"] = "%s: %d Mobs",
     
     -- Boss Kills
     ["BOSS_KILL_DETECTED"] = "Boss-Kill erkannt: %s",
     
     -- Export
     ["EXPORT_NO_DATA"] = "Keine Daten zum Exportieren.",
-    
-    -- World Buff Removal
-    ["WB_REMOVAL_SENT"] = "World Buff Entfernung an alle Gruppenmitglieder gesendet.",
-    ["WB_REMOVED_COUNT"] = "%d World Buffs entfernt.",
-    ["WB_DETECTED_PERMANENT"] = "World Buffs erkannt! Dieser Run wird dauerhaft als 'Mit World Buffs' markiert. (%d Spieler)",
-    ["WB_DETECTED"] = "World Buffs erkannt! (%d Spieler)",
-    
-    -- Trash Scanner Export
-    ["TRASH_EXPORT_COMPLETE"] = "Export abgeschlossen!",
-    ["TRASH_EXPORT_MOBS_COUNT"] = "-- %s (%d Mobs)",
     
     -- UI Tooltips
     ["TOOLTIP_ALL_SAME_VERSION"] = "- Alle haben das Addon (gleiche Version)",

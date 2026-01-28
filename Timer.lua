@@ -226,10 +226,7 @@ function TurtleDungeonTimer:performResetDirect(silent)
     -- silent: if true, don't show chat message
     resetRunDataCommon(self)
     
-    -- Show success message unless silent
-    if not silent then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("TIMER_RESET"), 1, 1, 0)
-    end
+    -- Always silent now - no output
 end
 
 -- Alias for backwards compatibility

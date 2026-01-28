@@ -78,17 +78,19 @@ end
 function TurtleDungeonTimer:onBossKilled(name)
     if not self.isRunning then return end
     
-    -- Check if this is one of our boss targets
-    for i = 1, table.getn(self.bossList) do
+    -- Performance: O(1) lookup instead of O(n) iteration
+    local i = self.bossLookup[name]
+    
+    if i then
         local boss = self.bossList[i]
         local bossName = type(boss) == "table" and boss.name or boss
         
         -- Debug output
         if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Comparing '" .. name .. "' with boss " .. i .. ": '" .. bossName .. "'")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Boss kill detected (O(1) lookup): '" .. name .. "' at index " .. i)
         end
         
-        if name == bossName then
+        if true then  -- Always true now since we found it in lookup
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[Turtle Dungeon Timer]|r Boss kill detected: " .. bossName)
             
             -- Check if already killed
@@ -131,8 +133,6 @@ function TurtleDungeonTimer:onBossKilled(name)
                 if requiredKills >= requiredBosses then
                     self:onAllBossesDefeated()
                 end
-                
-                break
             end
         end
     end
