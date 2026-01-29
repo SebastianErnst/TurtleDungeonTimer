@@ -78,6 +78,13 @@ initFrame:SetScript("OnEvent", function()
     local timer = TurtleDungeonTimer:getInstance()
     timer:initialize()
     
+    -- Show version loaded message
+    DEFAULT_CHAT_FRAME:AddMessage(
+        "|cff00ff00[" .. TDT_L("ADDON_NAME") .. "]|r " .. 
+        string.format(TDT_L("ADDON_VERSION_LOADED"), timer.ADDON_VERSION),
+        0, 1, 0
+    )
+    
     -- AUTOSCANNER DISABLED - UNCOMMENT TO RE-ENABLE
     -- Initialize Auto Trash Scanner
     -- if TDTAutoTrashScan then

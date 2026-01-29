@@ -40,6 +40,7 @@ local translations = {}
 translations.enUS = {
     -- General
     ["ADDON_NAME"] = "Turtle Dungeon Timer",
+    ["ADDON_VERSION_LOADED"] = "Version %s loaded",
     ["YES"] = "Yes",
     ["NO"] = "No",
     
@@ -247,6 +248,7 @@ translations.enUS = {
 translations.deDE = {
     -- General
     ["ADDON_NAME"] = "Turtle Dungeon Timer",
+    ["ADDON_VERSION_LOADED"] = "Version %s geladen",
     
     -- Preparation System
     ["PREP_ONLY_LEADER"] = "Nur der Gruppenführer kann den Run vorbereiten!",

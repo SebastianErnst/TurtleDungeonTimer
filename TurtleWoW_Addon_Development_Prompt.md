@@ -491,7 +491,7 @@ TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibil
 3. **Release number (x)**: Only change for major production releases
 
 **Version Display:**
-- Version is shown in chat when addon loads: "[Turtle Dungeon Timer] Version 0.14.0 loaded"
+- Version is shown in chat when addon loads: "[Turtle Dungeon Timer] Version 0.14.8 loaded"
 - Always keep Core.lua and .toc file versions synchronized
 
 **Why this matters:** 

@@ -247,31 +247,31 @@ TurtleDungeonTimer.DUNGEON_DATA = {
             }
         }
     },
-    -- ["The Stockade"] = {
-    --     isDungeon = true,
-    --     variants = {
-    --         ["Default"] = {
-    --             bosses = { "Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward" },
-    --             optionalBosses = {
-    --                 ["Bruegal Ironknuckle"] = true -- Rare
-    --             },
-    --             trashMobs = {
-    --                 { name = "Defias Captive",   hp = 2323, count = 7 },
-    --                 { name = "Defias Inmate",    hp = 2323, count = 21 },
-    --                 { name = "Defias Prisoner",  hp = 2160, count = 7 },
-    --                 { name = "Defias Prisoner",  hp = 2323, count = 6 },
-    --                 { name = "Defias Captive",   hp = 2160, count = 11 },
-    --                 { name = "Defias Convict",   hp = 2323, count = 7 },
-    --                 { name = "Defias Convict",   hp = 2495, count = 6 },
-    --                 { name = "Defias Inmate",    hp = 2495, count = 15 },
-    --                 { name = "Defias Insurgent", hp = 2495, count = 5 },
-    --                 { name = "Defias Insurgent", hp = 2677, count = 5 }
-    --             },
-    --             totalTrashHP = 212378,    -- Total: (2323*7 + 2323*21 + 2160*7 + 2160*11 + 2323*6 + 2323*7 + 2495*15 + 2495*5 + 2495*6 + 2677*5)
-    --             trashRequiredPercent = 50 -- 50% for testing, normally 80-100%
-    --         }
-    --     }
-    -- },
+    ["The Stockade"] = {
+        isDungeon = true,
+        variants = {
+            ["Default"] = {
+                bosses = { "Targorr the Dread", "Kam Deepfury", "Hamhock", "Bazil Thredd", "Dextren Ward" },
+                optionalBosses = {
+                    ["Bruegal Ironknuckle"] = true -- Rare
+                },
+                trashMobs = {
+                    { name = "Defias Captive",   hp = 2323, count = 7 },
+                    { name = "Defias Inmate",    hp = 2323, count = 21 },
+                    { name = "Defias Prisoner",  hp = 2160, count = 7 },
+                    { name = "Defias Prisoner",  hp = 2323, count = 6 },
+                    { name = "Defias Captive",   hp = 2160, count = 11 },
+                    { name = "Defias Convict",   hp = 2323, count = 7 },
+                    { name = "Defias Convict",   hp = 2495, count = 6 },
+                    { name = "Defias Inmate",    hp = 2495, count = 15 },
+                    { name = "Defias Insurgent", hp = 2495, count = 5 },
+                    { name = "Defias Insurgent", hp = 2677, count = 5 }
+                },
+                totalTrashHP = 212378,    -- Total: (2323*7 + 2323*21 + 2160*7 + 2160*11 + 2323*6 + 2323*7 + 2495*15 + 2495*5 + 2495*6 + 2677*5)
+                trashRequiredPercent = 50 -- 50% for testing, normally 80-100%
+            }
+        }
+    },
     ["Karazhan Crypt"] = {
         isDungeon = true,
         variants = {
