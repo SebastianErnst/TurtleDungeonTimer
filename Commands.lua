@@ -34,30 +34,31 @@ SlashCmdList["TURTLEDUNGEONTIMER"] = function(msg)
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT]|r Trash scanner not available!", 1, 0, 0)
         end
-    elseif msg == "autoscan" then
-        -- Open auto trash scanner window
-        if TDTAutoTrashScan and TDTAutoTrashScan.showListWindow then
-            TDTAutoTrashScan:showListWindow()
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT]|r Auto scan not available!", 1, 0, 0)
-        end
-    elseif msg == "autoscanon" then
-        -- Enable auto scan
-        if TDTAutoTrashScan then
-            TDTAutoTrashScan:enable()
-        end
-    elseif msg == "autoscanoff" then
-        -- Disable auto scan
-        if TDTAutoTrashScan then
-            TDTAutoTrashScan:disable()
-        end
+    -- AUTOSCANNER DISABLED - UNCOMMENT TO RE-ENABLE
+    -- elseif msg == "autoscan" then
+    --     -- Open auto trash scanner window
+    --     if TDTAutoTrashScan and TDTAutoTrashScan.showListWindow then
+    --         TDTAutoTrashScan:showListWindow()
+    --     else
+    --         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT]|r Auto scan not available!", 1, 0, 0)
+    --     end
+    -- elseif msg == "autoscanon" then
+    --     -- Enable auto scan
+    --     if TDTAutoTrashScan then
+    --         TDTAutoTrashScan:enable()
+    --     end
+    -- elseif msg == "autoscanoff" then
+    --     -- Disable auto scan
+    --     if TDTAutoTrashScan then
+    --         TDTAutoTrashScan:disable()
+    --     end
     elseif msg == "help" then
         -- Show help message
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Available commands:", 0, 1, 0)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt|r - Toggle timer window", 1, 1, 1)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt trash|r - Open manual trash scanner", 1, 1, 1)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscan|r - Open auto trash scanner", 1, 1, 1)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscanon/off|r - Toggle auto scanning", 1, 1, 1)
+        -- DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscan|r - Open auto trash scanner", 1, 1, 1)
+        -- DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscanon/off|r - Toggle auto scanning", 1, 1, 1)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt help|r - Show this help", 1, 1, 1)
     elseif msg == "config" then
         -- Open config menu (future feature)
@@ -77,10 +78,11 @@ initFrame:SetScript("OnEvent", function()
     local timer = TurtleDungeonTimer:getInstance()
     timer:initialize()
     
+    -- AUTOSCANNER DISABLED - UNCOMMENT TO RE-ENABLE
     -- Initialize Auto Trash Scanner
-    if TDTAutoTrashScan then
-        TDTAutoTrashScan:initialize()
-    end
+    -- if TDTAutoTrashScan then
+    --     TDTAutoTrashScan:initialize()
+    -- end
     
     -- Request current run data from group immediately
     timer:scheduleTimer(function()

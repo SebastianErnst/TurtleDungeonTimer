@@ -139,16 +139,17 @@ end
 
 function TDTAutoTrashScan:onEnterCombat()
     if not pullScan.enabled then 
-        if TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r Scanner is disabled, use /tdt autoscanon", 1, 0.5, 0)
-        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r Scanner is disabled, use /tdt autoscanon", 1, 0.5, 0)
         return 
     end
     
     -- Check if dungeon is selected
     local timer = TurtleDungeonTimer:getInstance()
     if not timer or not timer.selectedDungeon or not timer.selectedVariant then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r No dungeon selected!", 1, 0.5, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF8800[TDT Auto Scan]|r No dungeon selected! Use /tdt autoscan window to select dungeon/variant.", 1, 0.5, 0)
+        if timer then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFFAA00[TDT Auto Scan]|r Current: Dungeon=" .. tostring(timer.selectedDungeon) .. ", Variant=" .. tostring(timer.selectedVariant), 1, 0.8, 0)
+        end
         return
     end
     
@@ -163,12 +164,9 @@ function TDTAutoTrashScan:onEnterCombat()
     -- Reset raid marks for new pull
     resetRaidMarks()
     
-    -- Always show start message
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Auto Scan]|r Pull scan started - tab through mobs to mark them!", 0, 1, 0)
-    
-    if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FFFF[TDT Auto Scan Debug]|r Dungeon: " .. timer.selectedDungeon .. " (" .. timer.selectedVariant .. ")", 0, 1, 1)
-    end
+    -- Always show start message with dungeon info
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Auto Scan]|r Pull scan started for: " .. timer.selectedDungeon .. " (" .. timer.selectedVariant .. ")", 0, 1, 0)
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Auto Scan]|r Tab through mobs to mark them!", 0, 1, 0)
 end
 
 function TDTAutoTrashScan:onLeaveCombat()
@@ -205,9 +203,8 @@ function TDTAutoTrashScan:onTargetChanged()
     end
     
     if not pullScan.active then
-        if TurtleDungeonTimerDB.debug then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[Debug]|r Scan not active (not in combat?)", 1, 0, 1)
-        end
+        -- Show message even without debug for troubleshooting
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Auto Scan]|r Not in combat - scanner inactive", 1, 0.5, 1)
         return
     end
     
@@ -270,6 +267,16 @@ function TDTAutoTrashScan:onTargetChanged()
     
     -- Apply raid mark to target
     SetRaidTarget("target", markIndex)
+    
+    -- Debug: Check if marking was successful
+    if TurtleDungeonTimerDB.debug then
+        local actualMark = GetRaidTargetIndex("target")
+        if actualMark then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[Debug]|r Marked " .. name .. " with icon " .. markIndex, 0, 1, 0)
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[Debug]|r Failed to mark " .. name .. " (not group leader or no permission?)", 1, 0, 0)
+        end
+    end
     
     -- Store for potential death matching
     pullScan.lastTargetName = name
