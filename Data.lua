@@ -408,7 +408,7 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                 trashRequiredPercent = 50    -- 50% required
             },
             ["Upper"] = {
-                bosses = { "Pyroguard Emberseer", "Solakar Flamewreath", "Goraluk Anvilcrack", "Warchief Rend Blackhand" },
+                bosses = { "Pyroguard Emberseer", "Solakar Flamewreath", "Goraluk Anvilcrack", "Warchief Rend Blackhand",  "Gyth", "The Beast", "General Drakkisath"},
                 optionalBosses = {
                     ["Lord Valthalak"] = true -- Rare
                 },
@@ -444,7 +444,7 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                     { name = "Rage Talon Fire Tongue",    hp = 20143, count = 2 }
                 },
                 totalTrashHP = 2757160,      -- Total calculated by Python script
-                trashRequiredPercent = 50    -- 50% required
+                trashRequiredPercent = 75    -- 50% required
             }
         }
     },
