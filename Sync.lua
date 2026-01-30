@@ -52,10 +52,13 @@ function TurtleDungeonTimer:onAddonCheckResponse(sender, version)
     if not self.preparationChecks then
         self.preparationChecks = {}
     end
+    
+    -- Check if we already stored a version for this player
+    local previousVersion = self.preparationChecks[sender]
     self.preparationChecks[sender] = version or self.ADDON_VERSION
     
-    -- Check version compatibility (only warn if versions differ)
-    if version and version ~= self.ADDON_VERSION then
+    -- Check version compatibility (only warn if versions differ AND we haven't warned before)
+    if version and version ~= self.ADDON_VERSION and previousVersion ~= version then
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. string.format(TDT_L("SYNC_VERSION_WARNING"), sender, version), 1, 0.5, 0)
     end
 end
@@ -220,6 +223,10 @@ function TurtleDungeonTimer:sendSyncMessage(msgType, data)
         channel = "RAID"
     end
     
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug Sync] Sending " .. msgType .. " to " .. channel, 0, 1, 1)
+    end
+    
     SendAddonMessage(self.SYNC_PREFIX, message, channel)
 end
 
@@ -285,7 +292,7 @@ function TurtleDungeonTimer:checkResetVotes()
             self:performResetSilent()
             self.resetVotes = {}
             self.resetInitiator = nil
-            TDT_Print("SYNC_TIMER_RESET_GROUP", "success")
+            -- No chat message - countdown frame provides enough visual information
         else
             DEFAULT_CHAT_FRAME:AddMessage("||cffff0000[Turtle Dungeon Timer]||r Reset wurde abgelehnt", 1, 0, 0)
             self:sendSyncMessage("RESET_CANCEL")
@@ -429,7 +436,7 @@ function TurtleDungeonTimer:onSyncResetExecute(sender)
     self.resetVotes = {}
     self.resetInitiator = nil
     
-    DEFAULT_CHAT_FRAME:AddMessage("||cff00ff00[Turtle Dungeon Timer]||r " .. TDT_L("SYNC_TIMER_RESET_GROUP"), 1, 1, 0)
+    -- No chat message - countdown frame provides enough visual information
 end
 
 -- ============================================================================
@@ -1004,6 +1011,14 @@ function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
         DEFAULT_CHAT_FRAME:AddMessage("[Debug] Ready Check started by: " .. sender .. " with data: " .. tostring(data), 1, 1, 0)
     end
     
+    -- Store the leader name for later verification
+    self.currentRunLeader = sender
+    
+    -- Leader ignores their own ready check (already has correct runWithWorldBuffs set)
+    if sender == UnitName("player") then
+        return
+    end
+    
     -- Parse data: format is "dungeonName;wbFlag"
     local dungeonName = ""
     local wbFlag = "0"
@@ -1074,7 +1089,7 @@ function TurtleDungeonTimer:onSyncSetDungeon(data, sender)
         self:selectVariant(variantKey)
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Dungeon gesetzt: " .. dungeonKey .. (variantKey and (" (" .. variantKey .. ")") or ""), 0, 1, 0)
+    -- No chat message - countdown frame provides enough visual information
 end
 
 -- ============================================================================
@@ -1167,6 +1182,13 @@ function TurtleDungeonTimer:onSyncRequestCurrentRun(data, sender)
     table.insert(runDataParts, string.format("%.1f", trashProgress))
     table.insert(runDataParts, tostring(trashKilledHP))  -- Send absolute HP
     
+    -- 8. World Buff flag
+    local wbFlag = "0" -- Default: no World Buff info
+    if self.runWithWorldBuffs ~= nil then
+        wbFlag = self.runWithWorldBuffs and "1" or "2" -- 1 = with WBs, 2 = without WBs
+    end
+    table.insert(runDataParts, wbFlag)
+    
     -- Send as semicolon-separated string
     local runData = table.concat(runDataParts, ";")
     self:sendSyncMessage("CURRENT_RUN_DATA", runData)
@@ -1191,7 +1213,7 @@ function TurtleDungeonTimer:onSyncCurrentRunData(data, sender)
         end
     end
     
-    if table.getn(parts) < 8 then return end
+    if table.getn(parts) < 9 then return end
     
     local runData = {
         dungeon = parts[1],
@@ -1203,6 +1225,7 @@ function TurtleDungeonTimer:onSyncCurrentRunData(data, sender)
         bossKills = tonumber(parts[7]) or 0,
         trashProgress = tonumber(parts[8]) or 0,
         trashKilledHP = tonumber(parts[9]) or 0,  -- Parse absolute HP
+        wbFlag = parts[10] or "0",  -- World Buff flag
         sender = sender
     }
     
@@ -1271,7 +1294,8 @@ function TurtleDungeonTimer:processRunDataResponses()
         trashProgress = bestResponse.trashProgress,
         trashKilledHP = bestResponse.trashKilledHP,
         killTimesData = bestResponse.killTimesData or "",
-        timestamp = bestResponse.timestamp
+        timestamp = bestResponse.timestamp,
+        wbFlag = bestResponse.wbFlag or "0"  -- World Buff flag
     }
     
     -- Use the same merge logic as periodic sync (Best-of-All)
@@ -1493,7 +1517,18 @@ function TurtleDungeonTimer:mergeRemoteState(remoteState)
         table.insert(updateReasons, "Run-ID uebernommen")
     end
     
-    -- 2. Timer: Take highest (furthest progressed)
+    -- 2. Sync World Buff flag (if we don't have one yet or remote is more specific)
+    if self.runWithWorldBuffs == nil and remoteState.wbFlag and remoteState.wbFlag ~= "0" then
+        if remoteState.wbFlag == "1" then
+            self.runWithWorldBuffs = true
+        elseif remoteState.wbFlag == "2" then
+            self.runWithWorldBuffs = false
+        end
+        updated = true
+        table.insert(updateReasons, "World-Buff-Flag uebernommen")
+    end
+    
+    -- 3. Timer: Take highest (furthest progressed)
     -- But skip timer sync if run was recently aborted
     if remoteState.elapsedTime > 0 and not self.runAborted then
         local ourElapsed = 0
@@ -1518,7 +1553,7 @@ function TurtleDungeonTimer:mergeRemoteState(remoteState)
         end
     end
     
-    -- 3. Deaths: Take highest (more information)
+    -- 4. Deaths: Take highest (more information)
     if remoteState.deathCount > self.deathCount then
         self.deathCount = remoteState.deathCount
         updated = true
@@ -1529,7 +1564,7 @@ function TurtleDungeonTimer:mergeRemoteState(remoteState)
         end
     end
     
-    -- 4. Trash: Take highest (compare absolute HP to avoid rounding issues)
+    -- 5. Trash: Take highest (compare absolute HP to avoid rounding issues)
     local ourTrashProgress, ourTrashHP = 0, 0
     if TDTTrashCounter then
         ourTrashProgress, ourTrashHP = TDTTrashCounter:getProgress()
@@ -1547,7 +1582,7 @@ function TurtleDungeonTimer:mergeRemoteState(remoteState)
         table.insert(updateReasons, "Trash: " .. math.floor(ourTrashProgress) .. "% -> " .. math.floor(remoteState.trashProgress) .. "%")
     end
     
-    -- 5. Boss Kills: Merge killTimes (take latest times for each boss)
+    -- 6. Boss Kills: Merge killTimes (take latest times for each boss)
     if remoteState.killTimesData and remoteState.killTimesData ~= "" then
         local remoteKillTimes = self:deserializeKillTimes(remoteState.killTimesData)
         local mergedKills = self:mergeKillTimes(self.killTimes, remoteKillTimes)
@@ -1562,7 +1597,7 @@ function TurtleDungeonTimer:mergeRemoteState(remoteState)
         end
     end
     
-    -- 6. Countdown state
+    -- 7. Countdown state
     if remoteState.isCountingDown and not self.isCountingDown then
         self.isCountingDown = true
         updated = true
@@ -1679,30 +1714,28 @@ end
 
 -- Check if a player is the group leader
 function TurtleDungeonTimer:isPlayerGroupLeader(playerName)
+    -- If we stored the leader from ready check, use that
+    if self.currentRunLeader then
+        return (playerName == self.currentRunLeader)
+    end
+    
+    -- Fallback: Check using game API
     if GetNumRaidMembers() > 0 then
+        -- In raid, check rank (2 = leader)
         for i = 1, GetNumRaidMembers() do
-            print(name, rank)
+            local name, rank = GetRaidRosterInfo(i)
             if name == playerName and rank == 2 then
                 return true
             end
         end
         return false
     elseif GetNumPartyMembers() > 0 then
-        -- In party, check if player is the leader
-        if GetNumPartyMembers() > 0 then
-            -- In a party, leader is not in party1-4, they are "player" unit
-            local leaderName = UnitName("party") or UnitName("player")
-            -- Actually, in 1.12, we need to check differently
-            -- Party leader will have specific unit ID or be the player themselves
-            if playerName == UnitName("player") then
-                -- Check if we (the player) are the party leader
-                local isLeader = IsPartyLeader()
-                return isLeader == 1 or isLeader == true
-            end
-            -- For other party members, leader status is harder to determine
-            -- We'll trust that only actual leaders send this message
-            return false
+        -- In party: check if this is us and we're the leader
+        if playerName == UnitName("player") then
+            local isLeader = IsPartyLeader()
+            return isLeader == 1 or isLeader == true
         end
+        -- Can't reliably determine leader for other players in party without stored info
         return false
     else
         -- Solo player

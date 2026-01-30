@@ -151,19 +151,33 @@ function TDTTrashCounter:prepareDungeon(dungeonName, variantName)
 end
 
 function TDTTrashCounter:startDungeon(dungeonName, variantName)
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r startDungeon called: " .. tostring(dungeonName) .. ", " .. tostring(variantName), 0, 1, 0)
+    end
+    
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[dungeonName]
     
     if not dungeonData or not dungeonData.variants then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r startDungeon: No dungeonData or variants", 1, 0, 0)
+        end
         return  -- No dungeon data
     end
     
     local variantData = dungeonData.variants[variantName]
     if not variantData or not variantData.trashMobs then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r startDungeon: No variantData or trashMobs", 1, 0, 0)
+        end
         return  -- No trash data for this variant
     end
     
     currentDungeon = variantData
     killedTrashHP = 0
+    
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r startDungeon: currentDungeon set successfully, totalTrashHP=" .. tostring(currentDungeon.totalTrashHP), 0, 1, 0)
+    end
     
     -- Initialize saved progress (use dungeon+variant key)
     local progressKey = dungeonName .. "_" .. variantName
@@ -259,13 +273,25 @@ function TDTTrashCounter:checkRunCompletion()
 end
 
 function TDTTrashCounter:onMobKilled(mobName)
+    -- Debug: Check if tracking is active
+    if TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r onMobKilled called: " .. tostring(mobName), 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r currentDungeon=" .. tostring(currentDungeon ~= nil) .. ", trashLookup=" .. tostring(currentDungeon and currentDungeon.trashLookup ~= nil), 1, 1, 0)
+    end
+    
     if not currentDungeon or not currentDungeon.trashLookup then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r Early return: no currentDungeon or trashLookup", 1, 0, 0)
+        end
         return
     end
     
     -- Check if this is a trash mob we're tracking
     local avgHP = currentDungeon.trashLookup[mobName]
     if not avgHP then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[TDT Trash Debug]|r " .. mobName .. " not in lookup table", 1, 1, 0)
+        end
         return  -- Not a tracked trash mob
     end
     
@@ -297,7 +323,10 @@ function TDTTrashCounter:onMobKilled(mobName)
     -- Update UI (throttled)
     local currentTime = GetTime()
     if currentTime - lastUIUpdate >= UI_UPDATE_INTERVAL then
-        self:updateUI()
+        self:updateUI()  -- Update standalone progress frame
+        if TurtleDungeonTimer and TurtleDungeonTimer.updateProgressBar then
+            TurtleDungeonTimer:updateProgressBar()  -- Update timer UI
+        end
         lastUIUpdate = currentTime
     end
 end

@@ -63,10 +63,25 @@ function TurtleDungeonTimer:start()
     
     -- Start trash counter if dungeon has trash data
     local dungeonData = TurtleDungeonTimer.DUNGEON_DATA[self.selectedDungeon]
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r start(): dungeonData=" .. tostring(dungeonData ~= nil) .. ", selectedVariant=" .. tostring(self.selectedVariant), 1, 1, 0)
+    end
+    
     if dungeonData and self.selectedVariant then
         local variantData = dungeonData.variants[self.selectedVariant]
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r start(): variantData=" .. tostring(variantData ~= nil) .. ", trashMobs=" .. tostring(variantData and variantData.trashMobs ~= nil), 1, 1, 0)
+        end
+        
         if variantData and variantData.trashMobs then
+            if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Calling TDTTrashCounter:startDungeon(" .. self.selectedDungeon .. ", " .. self.selectedVariant .. ")", 0, 1, 0)
+            end
             TDTTrashCounter:startDungeon(self.selectedDungeon, self.selectedVariant)
+        else
+            if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r No trashMobs data for this dungeon/variant", 1, 0, 0)
+            end
         end
     end
     
@@ -191,8 +206,8 @@ local function resetRunDataCommon(self)
     self.killTimes = {}
     self.deathCount = 0
     
-    -- Reset run-specific World Buff flags and lists
-    self.runWithWorldBuffs = nil
+    -- DON'T reset runWithWorldBuffs - it's a preparation setting, not run data!
+    -- Only clear the player list
     self.runWorldBuffPlayers = {}
     
     -- Clear Run ID
@@ -390,20 +405,20 @@ function TurtleDungeonTimer:updateTimer()
         elapsed = self.restoredElapsedTime
     end
     
-    if elapsed > 0 and self.frame.timeText then
-        self.frame.timeText:SetText(self:formatTime(elapsed))
+    if elapsed > 0 and self.frame.timerText then
+        self.frame.timerText:SetText(self:formatTime(elapsed))
         self:updateStartButton()  -- Update button text
         
         -- Compare with best time
         local bestTime = self:getBestTime()
         if bestTime then
             if elapsed < bestTime.time then
-                self.frame.timeText:SetTextColor(0, 1, 0) -- Green = ahead
+                self.frame.timerText:SetTextColor(0, 1, 0) -- Green = ahead
             else
-                self.frame.timeText:SetTextColor(1, 0.5, 0.5) -- Red = behind
+                self.frame.timerText:SetTextColor(1, 0.5, 0.5) -- Red = behind
             end
         else
-            self.frame.timeText:SetTextColor(1, 1, 1)
+            self.frame.timerText:SetTextColor(1, 1, 1)
         end
     end
     
@@ -420,4 +435,7 @@ function TurtleDungeonTimer:updateTimer()
             self.frame.worldBuffText:SetText("")
         end
     end
+    
+    -- Update trash progress bar (calls UI.lua:updateProgressBar)
+    self:updateProgressBar()
 end

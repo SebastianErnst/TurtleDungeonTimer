@@ -50,7 +50,7 @@ end
 function TurtleDungeonTimer:startPreparation()
     -- Check if player is group leader
     if not self:isGroupLeader() then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_PREPARE"), 1, 0, 0)
+        -- No chat message needed - UI button already shows this restriction
         return
     end
     
@@ -657,7 +657,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    -- ResetInstances()
+    ResetInstances()
     
     -- Wait a moment for system message (or just simulate success)
     self:scheduleTimer(function()
@@ -686,6 +686,9 @@ function TurtleDungeonTimer:onResetSuccess()
     
     -- Update button to show "Abort" since preparation is now ready
     self:updateStartButton()
+    
+    -- Show ready message for leader
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
     
     -- Broadcast ready state to all
     self:sendSyncMessage("PREPARE_READY")
@@ -1253,19 +1256,34 @@ function TurtleDungeonTimer:finishReadyCheck()
         
         self:executeReset()
     else
-        -- Preparation failed
+        -- Preparation failed - build list of not ready players
         self.preparationState = "FAILED"
         if isLeader then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[✗] " .. TDT_L("PREP_FAILED") .. "|r " .. TDT_L("PREP_NOT_ALL_READY"), 1, 0, 0)
+            local playerList = table.concat(notReadyPlayers, ", ")
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Ready check failed - Players not ready: " .. playerList, 1, 0, 0)
+            -- Only broadcast to group, don't show local message again
+            self:broadcastPreparationFailed("Players not ready: " .. playerList)
         end
-        self:broadcastPreparationFailed(TDT_L("PREP_NOT_ALL_READY"))
     end
 end
 
 function TurtleDungeonTimer:failPreparation(reason)
     self.preparationState = "FAILED"
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[✗] " .. TDT_L("PREP_FAILED") .. "|r " .. reason, 1, 0, 0)
-    self:broadcastPreparationFailed(reason)
+    
+    -- Check if we're the leader
+    local isLeader = false
+    if GetNumPartyMembers() > 0 then
+        isLeader = (UnitIsPartyLeader("player") == 1)
+    else
+        isLeader = true
+    end
+    
+    if isLeader then
+        -- Leader shows message locally and broadcasts to group
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_FAILED") .. ": " .. reason, 1, 0, 0)
+        self:broadcastPreparationFailed(reason)
+    end
+    -- Non-leaders will receive the message via sync (onSyncPreparationFailed)
 end
 
 -- ============================================================================
@@ -1344,7 +1362,7 @@ function TurtleDungeonTimer:startCountdown(triggeredBy)
     -- Update button to show "Abort" since countdown started
     self:updateStartButton()
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. string.format(TDT_L("PREP_ENTERED_COUNTDOWN"), triggeredBy), 0, 1, 0)
+    -- No chat message - countdown frame provides enough visual information
     
     self:showCountdownFrame()
     self:updateCountdownTick()
@@ -1446,7 +1464,7 @@ function TurtleDungeonTimer:finishCountdown()
         self.countdownFrame.number:SetTextColor(0, 1, 0)
     end
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_STARTED"), 0, 1, 0)
+    -- No chat message - countdown frame provides enough visual information
     
     -- Hide after 2 seconds
     self:scheduleTimer(function()
@@ -1457,7 +1475,7 @@ function TurtleDungeonTimer:finishCountdown()
     self.preparationState = nil
     
     -- Start timer immediately after countdown
-    if not self.isRunning and self.selectedDungeon and self.selectedVariant then
+    if not self.isRunning and self.selectedDungeon then
         self:start()
     end
 end

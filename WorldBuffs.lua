@@ -33,12 +33,20 @@ function TurtleDungeonTimer:removeAllWorldBuffs()
             DEFAULT_CHAT_FRAME:AddMessage("[Debug] Sending REMOVE_WORLD_BUFFS sync message", 0, 1, 1)
         end
         
+        -- Send sync message first
         self:sendSyncMessage("REMOVE_WORLD_BUFFS")
         
-        -- Also remove our own buffs
-        self:removeOwnWorldBuffs()
-        
-        -- Silent - no output
+        -- Delay leader's own removal slightly to ensure sync message is sent first
+        local removeFrame = CreateFrame("Frame")
+        local elapsed = 0
+        removeFrame:SetScript("OnUpdate", function()
+            elapsed = elapsed + arg1
+            if elapsed >= 0.5 then  -- 500ms delay
+                removeFrame:SetScript("OnUpdate", nil)
+                local timer = TurtleDungeonTimer:getInstance()
+                timer:removeOwnWorldBuffs()
+            end
+        end)
     else
         -- Only leaders can initiate group-wide removal
         DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_REMOVE_WB"), 1, 0, 0)
@@ -56,46 +64,52 @@ end
 
 -- Remove world buffs from specific unit
 function TurtleDungeonTimer:removeWorldBuffsFromUnit(unit)
-    local removedCount = 0
+    -- Only player can remove their own buffs
+    if unit ~= "player" then
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug] Cannot remove buffs from " .. UnitName(unit) .. " (not player)", 0, 1, 1)
+        end
+        return
+    end
     
-    -- For each world buff name, search through ALL buffs and remove it if found
-    for worldBuffName, _ in pairs(WORLD_BUFFS) do
-        -- Search through all buffs for this specific world buff
-        for buffIndex = 1, 50 do  -- Max 50 buff slots
-            local buffTexture = UnitBuff(unit, buffIndex)
-            if not buffTexture then 
-                break  -- No more buffs
-            end
-            
-            -- Check if this buff matches our target world buff
-            scanTooltip:ClearLines()
-            scanTooltip:SetUnitBuff(unit, buffIndex)
-            local buffName = TDTWorldBuffScanTooltipTextLeft1:GetText()
-            
-            if buffName == worldBuffName then
-                -- Found it! Cancel this buff
-                if unit == "player" then
-                    CancelPlayerBuff(buffIndex)
-                    removedCount = removedCount + 1
-                    if TurtleDungeonTimerDB.debug then
-                        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Removed " .. buffName .. " from player (slot " .. buffIndex .. ")", 0, 1, 1)
-                    end
-                else
-                    if TurtleDungeonTimerDB.debug then
-                        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Cannot remove " .. buffName .. " from " .. UnitName(unit) .. " (not player)", 0, 1, 1)
-                    end
-                end
-                break  -- Exit inner loop, this world buff is handled
-            end
+    -- CRITICAL: Collect indices first, then remove from high to low!
+    -- When CancelPlayerBuff(i) is called, all buffs after index i shift down by 1
+    -- By removing from highest index to lowest, we avoid shifting issues
+    local removedCount = 0
+    local toRemove = {}  -- List of {index, name} to remove
+    
+    -- Scan all buffs and collect world buffs to remove
+    for i = 0, 32 do
+        local texture, count, buffType = GetPlayerBuff(i, "HELPFUL")
+        if not texture then
+            break  -- No more buffs
+        end
+        
+        -- Get buff name via tooltip - CRITICAL: Must hide/show to refresh!
+        scanTooltip:Hide()
+        scanTooltip:ClearLines()
+        scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        scanTooltip:SetPlayerBuff(i)
+        scanTooltip:Show()  -- Force tooltip refresh
+        
+        local buffName = TDTWorldBuffScanTooltipTextLeft1:GetText()
+        
+        if buffName and WORLD_BUFFS[buffName] then
+            -- Mark for removal
+            table.insert(toRemove, {index = i, name = buffName})
         end
     end
     
-    -- Silent - no output
-    if TurtleDungeonTimerDB.debug then
-        if removedCount > 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("[Debug] Removed " .. removedCount .. " world buffs", 0, 1, 1)
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("[Debug] No world buffs found to remove", 0, 1, 1)
+    scanTooltip:Hide()  -- Clean up tooltip
+    
+    -- Remove buffs from highest index to lowest to avoid shifting issues
+    for i = table.getn(toRemove), 1, -1 do
+        local buff = toRemove[i]
+        CancelPlayerBuff(buff.index)
+        removedCount = removedCount + 1
+        
+        if TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("[Debug] Removed world buff: " .. buff.name, 0, 1, 1)
         end
     end
 end
@@ -184,33 +198,26 @@ end
 
 -- Mark the current run as having world buffs
 function TurtleDungeonTimer:markRunWithWorldBuffs()
+    -- If run is WITHOUT world buffs, don't mark or show messages
+    if self.isRunning and self.runWithWorldBuffs == false then
+        return
+    end
+    
     local foundBuffs = self:scanGroupForWorldBuffs()
     
     if foundBuffs and next(foundBuffs) then
-        -- Check if this is the first time we found buffs
+        -- Check if this is first detection
         local isFirstDetection = not self.hasWorldBuffs
         
         -- At least one person has world buffs
         self.hasWorldBuffs = true
         self.worldBuffPlayers = foundBuffs
         
-        -- If a run is active, permanently mark it as "with World Buffs"
-        if self.isRunning and not self.runWithWorldBuffs then
-            self.runWithWorldBuffs = true
-            
-            local count = 0
-            for _ in pairs(foundBuffs) do
-                count = count + 1
-            end
-            
-            TDT_Print("WB_DETECTED_PERMANENT", "success", count)
-        end
-        
         -- Update UI indicator (always, even when not running)
         self:updateWorldBuffsIndicator()
         
-        -- Log message on first detection (outside of running)
-        if isFirstDetection and not self.isRunning then
+        -- Log message ONLY ONCE when first detected AND NOT running
+        if not self.isRunning and isFirstDetection then
             local count = 0
             for _ in pairs(foundBuffs) do
                 count = count + 1
@@ -218,6 +225,9 @@ function TurtleDungeonTimer:markRunWithWorldBuffs()
             
             TDT_Print("WB_DETECTED_CURRENT", "success", count)
         end
+        
+        -- During run: runWithWorldBuffs is ONLY set by preparation choice
+        -- Never automatically mark run as "with WB" during active run
     else
         -- No buffs found
         -- If run is active and already marked with World Buffs, keep the marker!
@@ -256,7 +266,13 @@ function TurtleDungeonTimer:startWorldBuffScanning()
         if elapsed >= 1.0 then  -- Scan every 1 second
             elapsed = 0
             local timer = TurtleDungeonTimer:getInstance()
-            timer:markRunWithWorldBuffs()
+            -- If run is active and WITHOUT World Buffs: Remove any detected buffs
+            if timer.isRunning and timer.runWithWorldBuffs == false then
+                timer:removeOwnWorldBuffs()
+            else
+                -- Normal behavior: Just mark run with WBs
+                timer:markRunWithWorldBuffs()
+            end
         end
     end)
 end

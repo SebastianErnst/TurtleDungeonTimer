@@ -341,6 +341,90 @@ UnitIsEnemy("player", "target")
 UnitIsDead("target")
 ```
 
+### Buff Functions
+
+**⚠️ CRITICAL: Three different buff APIs with different indexing AND ordering!**
+
+```lua
+-- API Comparison (WoW 1.12 / Turtle WoW):
+
+-- 1. UnitBuff(unit, index)
+--    - 1-based indexing (first buff = 1)
+--    - Internal buff order (NOT visual order!)
+--    - Returns: texture only
+
+-- 2. GetPlayerBuff(index, filter)
+--    - 0-based indexing (first buff = 0)
+--    - Visual/Interface order (matches UI buff bar!)
+--    - Returns: texture, count, buffType
+--    - Filter: "HELPFUL" (buffs), "HARMFUL" (debuffs), "PASSIVE" (passives)
+
+-- 3. CancelPlayerBuff(index)
+--    - 0-based indexing (first buff = 0)
+--    - Uses GetPlayerBuff order/indices!
+
+-- CRITICAL: UnitBuff and GetPlayerBuff return buffs in DIFFERENT ORDER!
+-- You CANNOT convert UnitBuff index to CancelPlayerBuff index with simple -1!
+```
+
+**❌ WRONG - Using UnitBuff with CancelPlayerBuff:**
+```lua
+-- This will remove THE WRONG BUFFS!
+for buffIndex = 1, 50 do
+    local buffTexture = UnitBuff("player", buffIndex)
+    if not buffTexture then break end
+    
+    scanTooltip:ClearLines()
+    scanTooltip:SetUnitBuff("player", buffIndex)
+    local buffName = MyScanTooltipTextLeft1:GetText()
+    
+    if buffName == "Greater Blessing of Sanctuary" then
+        -- BUG: UnitBuff index does NOT match CancelPlayerBuff index!
+        -- Different order means buffIndex-1 removes wrong buff!
+        CancelPlayerBuff(buffIndex - 1)  -- WRONG BUFF REMOVED!
+    end
+end
+```
+
+**✅ CORRECT - Using GetPlayerBuff with CancelPlayerBuff:**
+```lua
+-- Create hidden tooltip for scanning
+local scanTooltip = CreateFrame("GameTooltip", "MyScanTooltip", nil, "GameTooltipTemplate")
+scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+
+-- Scan all buffs using GetPlayerBuff
+for i = 0, 50 do  -- 0-based!
+    local texture, count, buffType = GetPlayerBuff(i, "HELPFUL")
+    if not texture then break end  -- No more buffs
+    
+    -- Get buff name via tooltip
+    scanTooltip:ClearLines()
+    scanTooltip:SetPlayerBuff(i)  -- Use SetPlayerBuff, not SetUnitBuff!
+    local buffName = MyScanTooltipTextLeft1:GetText()
+    
+    -- Process buff...
+    if buffName == "Greater Blessing of Sanctuary" then
+        CancelPlayerBuff(i)  -- Correct! Same index, same order
+    end
+end
+```
+
+**Why GetPlayerBuff is better:**
+1. **Same indexing:** Both GetPlayerBuff and CancelPlayerBuff use 0-based indices
+2. **Same ordering:** Both match the visual buff bar order
+3. **More info:** Returns count and buffType, not just texture
+4. **Direct mapping:** GetPlayerBuff(5) → CancelPlayerBuff(5) works perfectly
+
+**Tooltip methods:**
+- `scanTooltip:SetUnitBuff(unit, index)` - For UnitBuff indices (1-based)
+- `scanTooltip:SetPlayerBuff(index)` - For GetPlayerBuff indices (0-based)
+
+**Important notes:**
+- **Never mix UnitBuff with CancelPlayerBuff** - different ordering causes wrong buffs to be removed!
+- Always use GetPlayerBuff + CancelPlayerBuff together
+- GetPlayerBuff filter: "HELPFUL" = buffs, "HARMFUL" = debuffs, "PASSIVE" = passive effects
+- Tooltip text fields: `TooltipNameTextLeft1`, `TooltipNameTextRight1` (replace TooltipName with your tooltip's global name)
+
 ### Reputation
 
 ```lua

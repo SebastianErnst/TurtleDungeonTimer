@@ -57,9 +57,13 @@ SlashCmdList["TURTLEDUNGEONTIMER"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Available commands:", 0, 1, 0)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt|r - Toggle timer window", 1, 1, 1)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt trash|r - Open manual trash scanner", 1, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt version|r - Show addon version", 1, 1, 1)
         -- DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscan|r - Open auto trash scanner", 1, 1, 1)
         -- DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscanon/off|r - Toggle auto scanning", 1, 1, 1)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt help|r - Show this help", 1, 1, 1)
+    elseif msg == "version" then
+        -- Show addon version
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Version " .. timer.ADDON_VERSION, 0, 1, 1)
     elseif msg == "config" then
         -- Open config menu (future feature)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Config menu coming soon!", 1, 1, 0)
