@@ -1,6 +1,6 @@
 # Turtle Dungeon Timer
 
-**Version:** 0.15.2  
+**Version:** 0.15.3  
 **Author:** Zasamel  
 **Interface:** 11200 (WoW 1.12 - Vanilla)
 
