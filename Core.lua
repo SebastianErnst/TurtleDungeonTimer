@@ -12,9 +12,9 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- x = Release number (currently 0 for development)
 -- y = Feature version (0-999, increment when user says "funktioniert", reset z to 0)
 -- z = Build number (0-9999, increment on every change)
--- NOTE: This version MUST match the version in TurtleDungeonTimer.toc!
--- When updating version: Change ONLY this constant and the .toc file.
-TurtleDungeonTimer.ADDON_VERSION = "0.15.1"
+-- NOTE: This version MUST match the version in TurtleDungeonTimer.toc AND README.md!
+-- When updating version: Change this constant, the .toc file, AND the README.md file.
+TurtleDungeonTimer.ADDON_VERSION = "0.15.2"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil
@@ -521,5 +521,83 @@ function TurtleDungeonTimer:restoreLastRun()
             -- Update button state
             self:updateStartPauseButton()
         end
+    end
+end
+
+-- ============================================================================
+-- DUMMY DATA GENERATION (FOR TESTING)
+-- ============================================================================
+function TurtleDungeonTimer:generateDummyHistory()
+    -- Clear existing history
+    TurtleDungeonTimerDB.history = {}
+    
+    -- Define test dungeons and variants
+    local testRuns = {
+        {dungeon = "Deadmines", variant = "Default", time = 1234, deaths = 0, completed = true, trashProgress = 95.5},
+        {dungeon = "Deadmines", variant = "Hardcore", time = 1456, deaths = 2, completed = true, trashProgress = 88.3},
+        {dungeon = "Shadowfang Keep", variant = "Default", time = 1800, deaths = 1, completed = true, trashProgress = 100},
+        {dungeon = "Blackfathom Deeps", variant = "Default", time = 2100, deaths = 3, completed = false, trashProgress = 65.2},
+        {dungeon = "Gnomeregan", variant = "Default", time = 3200, deaths = 5, completed = true, trashProgress = 92.1},
+        {dungeon = "Scarlet Monastery", variant = "Library", time = 890, deaths = 0, completed = true, trashProgress = 100},
+        {dungeon = "Scarlet Monastery", variant = "Armory", time = 1050, deaths = 1, completed = true, trashProgress = 97.8},
+        {dungeon = "Razorfen Kraul", variant = "Default", time = 1670, deaths = 2, completed = true, trashProgress = 85.4},
+        {dungeon = "Uldaman", variant = "Default", time = 2400, deaths = 4, completed = false, trashProgress = 45.6},
+        {dungeon = "Zul'Farrak", variant = "Default", time = 1980, deaths = 1, completed = true, trashProgress = 94.2},
+    }
+    
+    -- Generate boss kills for each run
+    local function generateBossKills(dungeon, variant, totalTime)
+        local dungeonData = self.DUNGEON_DATA[dungeon]
+        if not dungeonData or not dungeonData.variants or not dungeonData.variants[variant] then
+            return {}
+        end
+        
+        local variantData = dungeonData.variants[variant]
+        if not variantData.bossList then return {} end
+        
+        local killTimes = {}
+        local numBosses = table.getn(variantData.bossList)
+        local timePerBoss = totalTime / numBosses
+        
+        for i = 1, numBosses do
+            local bossTime = math.floor(timePerBoss * i + math.random(-60, 60))
+            bossTime = math.max(60, math.min(bossTime, totalTime))
+            
+            table.insert(killTimes, {
+                bossName = variantData.bossList[i],
+                time = bossTime,
+                index = i
+            })
+        end
+        
+        return killTimes
+    end
+    
+    -- Generate entries with timestamps going back in time
+    local baseTime = time()
+    for i, run in ipairs(testRuns) do
+        local daysAgo = i - 1
+        local timestamp = baseTime - (daysAgo * 24 * 3600) - math.random(0, 86400)
+        
+        local entry = {
+            uuid = self:generateUUID(),
+            dungeon = run.dungeon,
+            variant = run.variant,
+            time = run.time,
+            deathCount = run.deaths,
+            killTimes = generateBossKills(run.dungeon, run.variant, run.time),
+            timestamp = timestamp,
+            date = date("%Y-%m-%d %H:%M", timestamp),
+            completed = run.completed,
+            playerName = UnitName("player"),
+            guildName = GetGuildInfo("player") or "Test Guild",
+            groupClasses = {"Warrior", "Priest", "Mage", "Rogue", "Hunter"},
+            hasWorldBuffs = (math.random(1, 2) == 1),
+            worldBuffPlayers = math.random(1, 2) == 1 and {UnitName("player")} or {},
+            trashProgress = run.trashProgress,
+            trashRequired = 100
+        }
+        
+        table.insert(TurtleDungeonTimerDB.history, entry)
     end
 end

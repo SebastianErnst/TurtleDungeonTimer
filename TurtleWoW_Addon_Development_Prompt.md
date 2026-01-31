@@ -540,10 +540,13 @@ end
 
 ### Version Management (TurtleDungeonTimer Specific)
 
-**⚠️ CRITICAL:** When updating the addon version, you MUST update it in TWO places (Single Source of Truth):
+**⚠️ CRITICAL:** When updating the addon version, you MUST update it in THREE places:
 
 1. **Core.lua** - The `ADDON_VERSION` constant
-2. **TurtleDungeonTimer.toc** - The `## Version:` field (must match Core.lua exactly)
+2. **TurtleDungeonTimer.toc** - The `## Version:` field
+3. **README.md** - The `**Version:**` field in the header
+
+(All three must match exactly!)
 
 **Version Format: x.y.z**
 - **x** = Release number (currently 0 for development, will be 1+ for production releases)

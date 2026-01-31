@@ -132,7 +132,7 @@ translations.enUS = {
     ["UI_EXPORT_BUTTON"] = "Export",
     ["UI_WORLDBUFFS_DETECTED"] = "World buffs detected",
     ["TOOLTIP_WORLDBUFFS_TITLE"] = "World Buffs",
-    ["TOOLTIP_WORLDBUFFS_DESC"] = "Players with active World Buffs:",
+    ["TOOLTIP_WORLDBUFFS_DESC"] = "Players with active World Buffs",
     ["UI_WORLDBUFF_CONFIRM_TITLE"] = "World Buffs Detected!",
     ["UI_WORLDBUFF_CONFIRM_QUESTION"] = "Start run with or without World Buffs?",
     ["UI_WORLDBUFF_PLAYERS_TITLE"] = "Players with World Buffs:",
@@ -141,6 +141,9 @@ translations.enUS = {
     ["UI_WITHOUT_WORLDBUFFS"] = "Without World Buffs",
     ["UI_WORLDBUFF_TRACKING_INFO"] = "Info: If World Buffs are activated after the timer starts (first combat or countdown ends), this run will be permanently marked as 'With World Buffs'.",
     ["UI_WORLDBUFF_REMOVAL_INFO"] = "Note: If 'Without World Buffs' is selected, all current World Buffs will be removed from all group members.",
+    ["UI_WORLDBUFF_COMBINED_INFO"] = "With World Buffs:\nWorld Buffs are fully allowed.\n\nWithout World Buffs:\nWorld Buffs are automatically removed for the entire run.",
+    ["UI_WORLDBUFF_LINK_TEXT"] = "List of tracked World Buffs",
+    ["UI_WORLDBUFF_TOOLTIP_TITLE"] = "Tracked World Buffs",
     ["WORLDBUFF_REMOVED_BY_LEADER"] = "World Buffs removed by group leader %s.",
     ["READY_CHECK_WITH_WB"] = "This run has active World Buffs!",
     ["READY_CHECK_WITHOUT_WB"] = "This run is WITHOUT active World Buffs",
@@ -164,6 +167,8 @@ translations.enUS = {
     ["UI_ABORT_DECLINED"] = "Abort was declined",
     ["UI_ABORT_VOTE_STATUS"] = "Abort Vote: %d/%d (YES: %d)",
     ["UI_ABORT_BY_GROUP_SYNC"] = "Run was aborted by the group",
+    ["UI_ABORT_PREPARATION_MESSAGE"] = "Do you really want to abort the preparation?",
+    ["PREP_ABORTED"] = "Preparation aborted",
     
     -- Debug Messages (keep in English for consistency)
     ["DEBUG_PREFIX"] = "[Debug]",
@@ -348,6 +353,9 @@ translations.deDE = {
     ["UI_WITHOUT_WORLDBUFFS"] = "Ohne World Buffs",
     ["UI_WORLDBUFF_TRACKING_INFO"] = "Info: Falls World Buffs nach dem Timer-Start aktiviert werden (erster Kampf oder Countdown 0), wird dieser Run dauerhaft als 'Mit World Buffs' markiert.",
     ["UI_WORLDBUFF_REMOVAL_INFO"] = "Hinweis: Bei Auswahl von 'Ohne World Buffs' werden alle aktuellen World Buffs von allen Gruppenmitgliedern entfernt.",
+    ["UI_WORLDBUFF_COMBINED_INFO"] = "Mit World Buffs:\nWorld Buffs sind vollständig erlaubt.\n\nOhne World Buffs:\nWorld Buffs werden automatisch für den gesamten Run entfernt.",
+    ["UI_WORLDBUFF_LINK_TEXT"] = "Liste der getrackten World Buffs",
+    ["UI_WORLDBUFF_TOOLTIP_TITLE"] = "Getrackte World Buffs",
     ["WORLDBUFF_REMOVED_BY_LEADER"] = "World Buffs wurden vom Gruppenführer %s entfernt.",
     ["READY_CHECK_WITH_WB"] = "Dieser Run hat aktive World Buffs!",
     ["READY_CHECK_WITHOUT_WB"] = "Dieser Run ist OHNE aktive World Buffs",
@@ -370,6 +378,8 @@ translations.deDE = {
     ["UI_ABORT_DECLINED"] = "Abbruch wurde abgelehnt",
     ["UI_ABORT_VOTE_STATUS"] = "Abbruch Vote: %d/%d (JA: %d)",
     ["UI_ABORT_BY_GROUP_SYNC"] = "Run wurde von der Gruppe abgebrochen",
+    ["UI_ABORT_PREPARATION_MESSAGE"] = "Möchten Sie die Vorbereitung wirklich abbrechen?",
+    ["PREP_ABORTED"] = "Vorbereitung abgebrochen",
     
     -- Debug Messages (keep in English for consistency)
     ["DEBUG_PREFIX"] = "[Debug]",
@@ -471,7 +481,22 @@ setmetatable(L, {
 -- Usage: TDT_L("KEY") or string.format(TDT_L("KEY"), value1, value2, ...)
 -- GLOBAL function for use in all addon files
 function TDT_L(key)
-    return TurtleDungeonTimer.L[key]
+    -- Direct access to translation tables to avoid metatable recursion
+    local langTable = translations[currentLanguage]
+    local fallbackTable = translations.enUS
+    
+    -- Try current language first
+    if langTable and langTable[key] then
+        return langTable[key]
+    end
+    
+    -- Fallback to English
+    if fallbackTable and fallbackTable[key] then
+        return fallbackTable[key]
+    end
+    
+    -- Return key itself if no translation found
+    return key
 end
 
 -- ============================================================================
@@ -481,10 +506,18 @@ end
 -- Usage: TDT_Print("KEY", color, arg1, arg2, ...)
 -- GLOBAL function for use in all addon files
 function TDT_Print(key, color, ...)
-    local prefix = "|cff00ff00[" .. TurtleDungeonTimer.L["ADDON_NAME"] .. "]|r "
+    -- Direct access to translation tables to avoid metatable recursion
+    local langTable = translations[currentLanguage]
+    local fallbackTable = translations.enUS
+    
+    -- Get addon name directly from translation tables
+    local addonName = (langTable and langTable["ADDON_NAME"]) or (fallbackTable and fallbackTable["ADDON_NAME"]) or "TDT"
+    local prefix = "|cff00ff00[" .. addonName .. "]|r "
+    
+    -- Get text directly from translation tables
+    local text = (langTable and langTable[key]) or (fallbackTable and fallbackTable[key]) or key
     
     -- Format text with arguments if provided
-    local text = TurtleDungeonTimer.L[key]
     if arg and table.getn(arg) > 0 then
         text = string.format(text, unpack(arg))
     end

@@ -1,270 +1,152 @@
 # Turtle Dungeon Timer
 
-**Version:** 1.0.1-alpha  
-**Author:** TurtleWoW Community  
+**Version:** 0.15.2  
+**Author:** Zasamel  
 **Interface:** 11200 (WoW 1.12 - Vanilla)
 
-Ein fortgeschrittener Dungeon- und Raid-Timer für Turtle WoW mit Boss-Tracking, Best Times, Splits und Gruppen-Synchronisation.
+A dungeon timer for Turtle WoW with boss tracking, best times, and group synchronization.
 
 ---
 
 ## Features
 
-### Core Features
-- ⏱️ **Präzises Timing**: Millisekunden-genaue Zeitmessung für Dungeon-Runs
-- 📊 **Boss Tracking**: Einzelne Kill-Zeiten für jeden Boss mit Split-Times
-- 🏆 **Best Time System**: Automatisches Speichern und Anzeigen der besten Zeiten
-- 💀 **Death Counter**: Tracking von Gruppen-Todes mit automatischer Erkennung
-- 📜 **Run History**: Speichert die letzten 10 Runs mit vollständigen Details
-- 🔄 **Group Sync**: Synchronisiert Timer, Boss-Kills und Resets in der Gruppe
-- 🎯 **World Buff Detection**: Erkennt automatisch World Buffs bei Run-Start
-- 📤 **Export System**: Base64-kodierte Export-Strings für externe Tracking-Tools
-
-### UI Features
-- 🖱️ **Minimap Button**: Schneller Zugriff über Minimap-Icon
-- 📐 **Flexible UI**: Minimierbar, verschiebbar, mit Collapse-Funktion
-- 🎨 **Visual Feedback**: Farbcodierte Zeiten (grün = besser als Best Time)
-- 📋 **Optional Boss Support**: Unterscheidung zwischen Required und Optional Bosses
-- 🔍 **History Browser**: Detailansicht vergangener Runs mit Report-Funktion
-
-### Advanced Features
-- 🗳️ **Reset Voting**: Demokratisches Reset-System für Gruppen
-- 💬 **Report System**: Teile Run-Ergebnisse in verschiedenen Chat-Channels
-- 🔌 **Addon Detection**: Automatische Erkennung von Gruppenmitgliedern mit Addon
-- 💾 **Persistent State**: Automatisches Speichern und Wiederherstellen von Runs
+- ⏱️ **Precise Timing**: Second-accurate measurement for dungeon runs
+- 📊 **Boss & Trash Tracking**: Automatic detection of all kills via combat log
+- 💀 **Death Counter**: Tracks group deaths with automatic detection
+- 📜 **Run History**: Saves the last 10 runs with complete details
+- 🔄 **Group Sync**: Synchronizes timer, boss kills, and resets across the group
+- 🎯 **World Buff System**: Detects 21 world buffs and optionally removes them during runs
+- 📤 **Export System**: Base64-encoded export strings for external tracking tools
+- 🖱️ **Minimap Button**: Quick access via minimap icon
+- 🗳️ **Voting System**: Democratic ready checks and reset votes
 
 ---
 
 ## Installation
 
-1. Lade das Addon herunter
-2. Entpacke den Ordner `TurtleDungeonTimer` nach:
+### Via TWoW Launcher (recommended)
+The easiest way - updates are applied automatically:
+
+1. Copy the GitHub URL
+2. Open TWoW Launcher → "Addons" → "+ Add new addon"
+3. Paste the URL
+4. Restart the game
+
+### Manual Installation
+
+1. Download the .zip and extract it
+2. Move the folder to:
    ```
-   <WoW-Directory>\Interface\AddOns\
+   <WoW-Directory>\Interface\AddOns\TurtleDungeonTimer
    ```
-3. Starte WoW neu oder gib `/reload` ein
+3. **Important**: Folder must be named "TurtleDungeonTimer" (remove "-main" if present)
+4. Restart game or type `/reload`
 
 ---
 
-## Verwendung
+## Usage
 
-### Befehle
+### Commands
 
-```lua
-/tdt                    -- Toggle Timer-Fenster
-/turtledungeontimer     -- Alias für /tdt
-/tdt help               -- Toggle Timer-Fenster
+```
+/tdt              -- Open/close timer window
+/tdt help         -- Show help
+/tdt version      -- Show version
 ```
 
-### Schnellstart
+### Run Workflow
 
-1. **Dungeon auswählen**: Klicke auf den Dungeon-Selector Button
-2. **Timer starten**: 
-   - Manuell: Klicke auf "START" Button
-   - Automatisch: Betritt Kampf oder stirb im Dungeon
-3. **Bosse töten**: Timer trackt automatisch Boss-Kills über Combat-Log
-4. **Run abschließen**: Alle Required Bosses töten oder manuell stoppen
+1. **Start Preparation**: Click "START" button (group leader only)
+2. **Select Dungeon**: Choose dungeon and variant from the list
+3. **World Buffs**: Decide "With World Buffs" or "Without World Buffs"
+   - **With World Buffs**: All buffs allowed during the run
+   - **Without World Buffs**: All world buffs continuously removed
+4. **Ready Check**: Group votes if everyone is ready
+5. **Enter Dungeon**: Countdown starts automatically upon entering
+6. **Start Run**: Timer starts after countdown (0) or on first pull
+7. **Kill Bosses & Trash**: Timer automatically tracks all kills
+8. **Complete Run**: All required bosses + trash dead = run is saved
+
+**⚠️ Important**: Run aborts if someone leaves or joins the group!
 
 ### Minimap Button
 
-- **Linksklick**: Timer-Fenster öffnen/schließen
-- **Rechtsklick**: Schnellmenü (aktuell: Toggle)
-- **Drag**: Position um die Minimap verschieben
+- **Left-Click**: Open/close timer window
+- **Drag**: Move position around minimap
 
 ---
 
-## Module Übersicht
+## Supported Dungeons
 
-| Modul | Beschreibung | Dokumentation |
-|-------|-------------|---------------|
-| **Core.lua** | Hauptlogik, Singleton-Pattern, Datenverwaltung | [CORE.md](CORE.md) |
-| **Timer.lua** | Timer-Logik, Start/Stop/Reset, Gruppen-Info | [TIMER.md](TIMER.md) |
-| **UI.lua** | Frame-Erstellung, Layout, Visual Updates | [UI.md](UI.md) |
-| **UIMenus.lua** | Dropdown-Menüs, Boss-Rows, Dungeon-Auswahl | [UIMENUS.md](UIMENUS.md) |
-| **Events.lua** | Event-Handler, Boss-Detection, Combat-Tracking | [EVENTS.md](EVENTS.md) |
-| **Data.lua** | Dungeon-Definitionen, Boss-Listen | [DATA.md](DATA.md) |
-| **Sync.lua** | Gruppen-Synchronisation, Voting-System | [SYNC.md](SYNC.md) |
-| **Export.lua** | Export-System, Base64-Encoding, UUID-Gen | [EXPORT.md](EXPORT.md) |
-| **Minimap.lua** | Minimap-Button, Drag-Funktionalität | [MINIMAP.md](MINIMAP.md) |
-| **WorldBuffs.lua** | World Buff Detection & Tracking | [WORLDBUFFS_README.md](WORLDBUFFS_README.md) |
-| **Commands.lua** | Slash-Commands, Auto-Initialisierung | [COMMANDS.md](COMMANDS.md) |
-
----
-
-## Saved Variables
-
-### TurtleDungeonTimerDB
-
-```lua
-TurtleDungeonTimerDB = {
-    bestTimes = {},           -- Best times per dungeon/variant
-    settings = {},            -- User settings
-    lastSelection = {},       -- Last selected dungeon/variant
-    lastRun = {},            -- Last unfinished run data
-    history = {},            -- Last 10 completed runs
-    position = {},           -- Window position
-    visible = false,         -- Window visibility state
-    minimized = false,       -- Minimized state
-    minimapAngle = 200      -- Minimap button position
-}
-```
-
----
-
-## Dungeon Support
-
-### Aktuell Implementiert
-- **Black Morass** (Turtle WoW Custom)
-- **Stormwind Vault** (Turtle WoW Custom)
-- **Stratholme** (Live/UD/Full)
+- **Black Morass**
+- **Blackrock Spire** (Upper/Lower)
 - **Dire Maul** (North/East/West)
-- **Upper Blackrock Spire** (Full/First Half/Second Half)
-
-### Geplant
-Siehe `Data.lua` für kommentierte Classic-Dungeons (Ragefire, Deadmines, etc.)
-
----
-
-## API für Entwickler
-
-### Singleton-Zugriff
-
-```lua
-local timer = TurtleDungeonTimer:getInstance()
-```
-
-### Wichtige Methoden
-
-```lua
--- Timer-Steuerung
-timer:start()                    -- Timer starten
-timer:stop()                     -- Timer stoppen (ohne Save)
-timer:reset()                    -- Timer zurücksetzen (mit Bestätigung)
-
--- Dungeon-Auswahl
-timer:selectDungeon("Stratholme")
-timer:selectVariant("Live")
-
--- UI-Steuerung
-timer:show()
-timer:hide()
-timer:toggle()
-timer:toggleMinimized()
-
--- Daten-Zugriff
-local bestTime = timer:getBestTime()
-local history = TurtleDungeonTimerDB.history
-
--- World Buffs
-local hasBuffs, buffName = timer:hasWorldBuffs("player")
-local groupBuffs = timer:scanGroupForWorldBuffs()
-```
+- **Karazhan Crypt**
+- **Scholomance**
+- **Stormwind Vault**
+- **Stratholme** (Living/Undead)
 
 ---
 
-## Technische Details
+## Known Limitations
 
-### Lua 5.1 Kompatibilität
-
-Das Addon folgt strikt den **WoW 1.12 / Lua 5.1** Einschränkungen:
-- Kein `#` Operator → `table.getn()`
-- Kein `%` Operator → `mod()` Funktion
-- Kein `string.gmatch()` → `string.gfind()`
-- Event Handler nutzen implicit globals (`this`, `event`, `arg1`-`arg9`)
-- Kein `...` varargs → `arg` table
-
-Siehe [TurtleWoW_Addon_Development_Prompt.md](TurtleWoW_Addon_Development_Prompt.md) für Details.
-
-### Performance
-
-- **Event-basiert**: Minimale CPU-Last durch OnUpdate nur wenn nötig
-- **Lazy Loading**: UI-Elemente werden erst bei Bedarf erstellt
-- **Optimierte Loops**: Keine verschachtelten table-Iterationen
-- **SavedVariables**: Automatisches Speichern beim Logout
-
----
-
-## Bekannte Limitierungen
-
-1. **Boss-Erkennung**: Basiert auf Combat-Log-Namen (exakte Übereinstimmung nötig)
-2. **Sync-System**: Erfordert gleiche Addon-Version in der Gruppe
-3. **History**: Nur die letzten 10 Runs werden gespeichert
-4. **Export**: Keine Import-Funktion (nur Export)
+- Boss detection based on exact combat log names
+- Sync system requires same addon version across group
+- Only the last 10 runs are saved
+- Export function only (no import possible)
 
 ---
 
 ## Troubleshooting
 
-### Timer startet nicht automatisch
-- Prüfe ob ein Dungeon ausgewählt ist
-- Stelle sicher dass mindestens 1 Boss definiert ist
-- Überprüfe ob der Run bereits abgeschlossen ist
+### Timer doesn't start
+- Check if a dungeon is selected
+- Ensure at least 1 boss is defined
+- Check if run is already completed
 
-### Boss-Kills werden nicht erkannt
-- Boss-Name muss exakt mit `Data.lua` übereinstimmen
-- Combat-Log muss "X dies." oder "X has died." enthalten
-- Prüfe mit `/console scriptErrors 1` auf Lua-Fehler
+### Boss kills not detected
+- Boss name must exactly match the definition
+- Combat log must contain "X dies." or "X has died."
+- Enable Lua errors: `/console scriptErrors 1`
 
-### Sync funktioniert nicht
-- Alle Gruppenmitglieder müssen das Addon haben
-- Addon-Version muss übereinstimmen
-- Prüfe mit `/script print(TurtleDungeonTimer.SYNC_VERSION)`
+### Sync not working
+- All group members must have the addon installed
+- Addon version must match for everyone
+- Check version with: `/tdt version`
 
-### World Buffs werden nicht erkannt
-- Buff-Name muss exakt übereinstimmen (siehe `WorldBuffs.lua`)
-- Check wird 0.5s nach Timer-Start durchgeführt
-- Funktioniert nur mit den 7 definierten World Buffs
-
----
-
-## Mitwirken
-
-### Bug Reports
-Bitte öffne ein Issue mit:
-- Detaillierter Beschreibung
-- Schritte zur Reproduktion
-- Lua-Fehler (falls vorhanden)
-- Screenshots (wenn hilfreich)
-
-### Feature Requests
-Feature-Ideen sind willkommen! Beschreibe:
-- Use Case / Anwendungsfall
-- Erwartetes Verhalten
-- Beispiel-Screenshots (wenn möglich)
-
-### Code Contributions
-1. Fork das Repository
-2. Erstelle einen Feature-Branch
-3. Befolge die Lua 5.1 Guidelines
-4. Teste ausgiebig in-game
-5. Erstelle einen Pull Request
-
----
-
-## Credits
-
-- **Entwicklung**: TurtleWoW Community
-- **Testing**: Dungeon-Runner Community
-- **Inspiration**: ClassicTimers, Details, WeakAuras
-
----
-
-## Lizenz
-
-MIT License - Siehe LICENSE Datei für Details
+### World Buffs not detected
+- Buff name must match exactly
+- Check occurs 0.5s after timer start
+- 21 world buffs are tracked (see WorldBuffs.lua)
 
 ---
 
 ## Changelog
 
-### v1.0.1-alpha (Current)
-- ✨ World Buff Detection hinzugefügt
-- 🐛 EnableMouseWheel() Lua 5.1 Fix
-- 📚 Umfassende Dokumentation
+### v0.15.1 (Current)
+- ✨ World Buff System: 21 buffs including all Sayge's Fortune variants
+- 🎨 Compact World Buff dialog with hover tooltip
+- 🔧 Dynamic World Buff list instead of hardcoded values
+- 🗳️ Improved voting system for ready checks
+- 📊 History browser with overlay system
+- 🐛 Various bug fixes and performance improvements
 
-### v1.0.0-alpha (Initial)
-- 🎉 Erste Alpha-Version
-- ⏱️ Core Timer-Funktionalität
-- 🔄 Gruppen-Sync System
-- 📤 Export-Feature
-- 🗺️ Minimap-Button
+### v0.15.0
+- 🎉 First public alpha version
+- ⏱️ Core timer functionality
+- 🔄 Group sync system
+- 📤 Export feature
+- 🗺️ Minimap button
+
+---
+
+## Credits
+
+- **Development**: Zasamel
+- **Testing**: TurtleWoW Dungeon-Runner Community
+
+---
+
+## License
+
+MIT License - See LICENSE file for details

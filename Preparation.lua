@@ -67,7 +67,7 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     
     local dialog = CreateFrame("Frame", nil, UIParent)
     dialog:SetWidth(300)
-    dialog:SetHeight(400)
+    dialog:SetHeight(350)
     dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     dialog:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -104,8 +104,8 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
     
     -- Create scroll frame for dungeon list
     local scrollFrame = CreateFrame("ScrollFrame", nil, dialog)
-    scrollFrame:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, -60)
-    scrollFrame:SetWidth(260)
+    scrollFrame:SetPoint("TOP", dialog, "TOP", 20, -60)
+    scrollFrame:SetWidth(280)
     scrollFrame:SetHeight(280)
     
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
@@ -383,7 +383,7 @@ function TurtleDungeonTimer:showWorldBuffConfirmationDialog(foundBuffs)
     
     local dialog = CreateFrame("Frame", nil, UIParent)
     dialog:SetWidth(350)
-    dialog:SetHeight(500)
+    dialog:SetHeight(270)
     dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     dialog:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -431,69 +431,84 @@ function TurtleDungeonTimer:showWorldBuffConfirmationDialog(foundBuffs)
     
     -- Only show "Players with World Buffs" section if buffs are found
     if foundBuffs and next(foundBuffs) then
-        local playersTitle = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        playersTitle:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
-        playersTitle:SetText(TDT_L("UI_WORLDBUFF_PLAYERS_TITLE"))
-        playersTitle:SetTextColor(0.2, 1, 0.2)
+        -- Create interactive link frame for players with buffs
+        local playersLinkFrame = CreateFrame("Frame", nil, dialog)
+        playersLinkFrame:SetPoint("TOP", dialog, "TOP", 0, yOffset)  -- Centered
+        playersLinkFrame:SetWidth(350)
+        playersLinkFrame:SetHeight(20)
+        playersLinkFrame:EnableMouse(true)
         
-        yOffset = yOffset - 20
-        for playerName, buffName in pairs(foundBuffs) do
-            local playerText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            playerText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 30, yOffset)
-            playerText:SetText("  " .. playerName .. ": " .. buffName)
-            playerText:SetTextColor(1, 1, 0)
-            yOffset = yOffset - 15
-        end
-        yOffset = yOffset - 10
+        local playersTitle = playersLinkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        playersTitle:SetPoint("CENTER", playersLinkFrame, "CENTER", 0, 0)  -- Centered
+        playersTitle:SetText(TDT_L("UI_WORLDBUFF_PLAYERS_TITLE"))
+        playersTitle:SetTextColor(0.3, 0.8, 1.0)  -- Light blue link color
+        
+        -- Tooltip with players and their buffs
+        playersLinkFrame:SetScript("OnEnter", function()
+            playersTitle:SetTextColor(0.5, 1.0, 1.0)  -- Brighter on hover
+            GameTooltip:SetOwner(playersLinkFrame, "ANCHOR_RIGHT")
+            GameTooltip:SetText(TDT_L("UI_WORLDBUFF_PLAYERS_TITLE"), 1, 0.82, 0, 1, true)
+            for playerName, buffName in pairs(foundBuffs) do
+                GameTooltip:AddLine(playerName .. ": " .. buffName, 1, 1, 0)
+            end
+            GameTooltip:Show()
+        end)
+        
+        playersLinkFrame:SetScript("OnLeave", function()
+            playersTitle:SetTextColor(0.3, 0.8, 1.0)  -- Back to normal
+            GameTooltip:Hide()
+        end)
+        
+        yOffset = yOffset - 30
     end
     
-    -- World Buffs list section
-    local buffListTitle = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    buffListTitle:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
-    buffListTitle:SetText(TDT_L("UI_WORLDBUFF_LIST_TITLE"))
-    buffListTitle:SetTextColor(0.8, 0.8, 0.8)
-    
-    yOffset = yOffset - 20
-    -- Get list of tracked buffs from WorldBuffs.lua
-    local trackedBuffs = {
-        "Rallying Cry of the Dragonslayer",
-        "Spirit of Zandalar",
-        "Warchief's Blessing",
-        "Songflower Serenade",
-        "Fengus' Ferocity",
-        "Mol'dar's Moxie",
-        "Slip'kik's Savvy"
-    }
-    
-    for _, buffName in ipairs(trackedBuffs) do
-        local buffText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        buffText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 30, yOffset)
-        buffText:SetText("  • " .. buffName)
-        buffText:SetTextColor(0.7, 0.7, 0.7)
-        yOffset = yOffset - 15
+    -- Get list of tracked buffs from WorldBuffs.lua (for tooltip)
+    local timer = TurtleDungeonTimer:getInstance()
+    local worldBuffsTable = timer:getTrackedWorldBuffs()
+    local trackedBuffs = {}
+    for buffName, _ in pairs(worldBuffsTable) do
+        table.insert(trackedBuffs, buffName)
     end
+    table.sort(trackedBuffs)  -- Sort alphabetically for consistent display
     
-    -- Add tracking info section
-    yOffset = yOffset - 10
+    -- Combined info section
     local infoText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
     infoText:SetWidth(310)
-    infoText:SetText(TDT_L("UI_WORLDBUFF_TRACKING_INFO"))
-    infoText:SetTextColor(1, 1, 0.5)
+    infoText:SetText(TDT_L("UI_WORLDBUFF_COMBINED_INFO"))
+    infoText:SetTextColor(1, 1, 0.8)
     infoText:SetJustifyH("LEFT")
-    -- Set a reasonable height estimate instead of using GetStringHeight()
-    infoText:SetHeight(40)
-    yOffset = yOffset - 50
+    yOffset = yOffset - 70  -- Extra spacing before link
     
-    -- Add removal warning section
-    local removalText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    removalText:SetPoint("TOPLEFT", dialog, "TOPLEFT", 20, yOffset)
-    removalText:SetWidth(310)
-    removalText:SetText(TDT_L("UI_WORLDBUFF_REMOVAL_INFO"))
-    removalText:SetTextColor(1, 0.5, 0.5)
-    removalText:SetJustifyH("LEFT")
-    removalText:SetHeight(30)
-    yOffset = yOffset - 40
+    -- Create interactive "World Buffs" link frame below info text
+    local linkFrame = CreateFrame("Frame", nil, dialog)
+    linkFrame:SetPoint("TOP", dialog, "TOP", 0, yOffset)  -- Centered
+    linkFrame:SetWidth(350)
+    linkFrame:SetHeight(20)
+    linkFrame:EnableMouse(true)
+    
+    local linkText = linkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    linkText:SetPoint("CENTER", linkFrame, "CENTER", 0, 0)  -- Centered
+    linkText:SetText(TDT_L("UI_WORLDBUFF_LINK_TEXT"))
+    linkText:SetTextColor(0.3, 0.8, 1.0)  -- Light blue link color
+    
+    -- Tooltip with buff list on hover
+    linkFrame:SetScript("OnEnter", function()
+        linkText:SetTextColor(0.5, 1.0, 1.0)  -- Brighter on hover
+        GameTooltip:SetOwner(linkFrame, "ANCHOR_RIGHT")
+        GameTooltip:SetText(TDT_L("UI_WORLDBUFF_TOOLTIP_TITLE"), 1, 0.82, 0, 1, true)
+        for _, buffName in ipairs(trackedBuffs) do
+            GameTooltip:AddLine("  • " .. buffName, 0.8, 0.8, 0.8)
+        end
+        GameTooltip:Show()
+    end)
+    
+    linkFrame:SetScript("OnLeave", function()
+        linkText:SetTextColor(0.3, 0.8, 1.0)  -- Back to normal
+        GameTooltip:Hide()
+    end)
+    
+    yOffset = yOffset - 30
     
     -- With World Buffs button (green)
     local withBtn = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
@@ -538,6 +553,7 @@ function TurtleDungeonTimer:beginPreparationChecks()
     end
     self.countdownTriggered = false
     self.firstZoneEnter = nil
+    self.prepareReadyMessageShown = false  -- Reset flag for new preparation cycle
     
     -- Get display name for the pending dungeon
     local dungeonData = self.DUNGEON_DATA[self.pendingDungeonSelection]
@@ -657,7 +673,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    ResetInstances()
+    -- ResetInstances()
     
     -- Wait a moment for system message (or just simulate success)
     self:scheduleTimer(function()
@@ -688,7 +704,15 @@ function TurtleDungeonTimer:onResetSuccess()
     self:updateStartButton()
     
     -- Show ready message for leader
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r onResetSuccess - About to send PREPARE_READY", 1, 1, 0)
+    end
+    
+    -- Only show message once per preparation cycle
+    if not self.prepareReadyMessageShown then
+        self.prepareReadyMessageShown = true
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
+    end
     
     -- Broadcast ready state to all
     self:sendSyncMessage("PREPARE_READY")
@@ -709,61 +733,33 @@ end
 TurtleDungeonTimer.readyCheckResponses = {}
 TurtleDungeonTimer.readyCheckStarted = false
 
-function TurtleDungeonTimer:startReadyCheck()
-    self.preparationState = "READY_CHECK"
-    self.readyCheckResponses = {}
-    self.readyCheckStarted = GetTime()
-    
-    -- Broadcast ready check request with dungeon name to all group members
-    local dungeonName = ""
-    if self.pendingDungeonSelection then
-        -- Use pending dungeon selection (not yet set as selectedDungeon)
-        dungeonName = self.pendingDungeonSelection
-    end
-    -- Ensure dungeonName is never nil
-    dungeonName = dungeonName or ""
-    
-    -- Add World Buff info to sync message (format: "dungeonName;wbFlag")
-    local wbFlag = "0" -- Default: no World Buff info
-    if self.runWithWorldBuffs ~= nil then
-        wbFlag = self.runWithWorldBuffs and "1" or "2" -- 1 = with WBs, 2 = without WBs
-    end
-    local syncData = dungeonName .. ";" .. wbFlag
-    
-    self:sendSyncMessage("READY_CHECK_START", syncData)
-    
-    -- Auto-respond for self (leader) - leader is always ready
-    self.readyCheckResponses[UnitName("player")] = true
-    
-    -- DON'T show ready check prompt for leader - they started it, so they're ready
-    -- Check if all members have already responded (solo case)
-    self:checkReadyCheckComplete()
-    
-    -- Timeout after 30 seconds
-    self:scheduleTimer(function()
-        if self.preparationState == "READY_CHECK" then
-            self:finishReadyCheck()
-        end
-    end, 30, false)
-end
-
--- Show the ready check prompt to a player
--- dungeonName: optional parameter with dungeon name (from sync message)
--- leaderName: name of the player who started the ready check
-function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName, leaderName)
-    -- Close existing ready check frame
-    if self.readyCheckPromptFrame then
-        self.readyCheckPromptFrame:Hide()
-        self.readyCheckPromptFrame = nil
+-- ============================================================================
+-- GENERIC GROUP VOTE UI (used for Ready Check and Abort Vote)
+-- ============================================================================
+-- Creates a vote prompt with player status display (portraits/names)
+-- Parameters:
+--   voteType: "ready_check" or "abort_vote"
+--   title: Dialog title text
+--   dungeonName: (optional) Dungeon name to display
+--   initiatorName: (optional) Name of player who started the vote
+--   responsesTable: Table to track responses {playerName = true/false/nil}
+--   onYesCallback: function() - Called when player votes YES
+--   onNoCallback: function() - Called when player votes NO
+--   frameRefName: (optional) Property name to store frame reference (e.g., "readyCheckPromptFrame")
+function TurtleDungeonTimer:showGroupVotePrompt(voteType, title, dungeonName, initiatorName, responsesTable, onYesCallback, onNoCallback, frameRefName)
+    -- Close existing frame if specified
+    if frameRefName and self[frameRefName] then
+        self[frameRefName]:Hide()
+        self[frameRefName] = nil
     end
     
-    -- Mark leader as ready automatically (they started the check)
-    if leaderName then
-        self.readyCheckResponses[leaderName] = true
+    -- Mark initiator as responded automatically (they started the vote)
+    if initiatorName and responsesTable then
+        responsesTable[initiatorName] = true
     end
     
-    -- Create custom ready check frame
-    local frame = CreateFrame("Frame", "TDTReadyCheckFrame", UIParent)
+    -- Create custom vote frame
+    local frame = CreateFrame("Frame", "TDTVoteFrame_" .. voteType, UIParent)
     frame:SetWidth(420)
     frame:SetHeight(320)
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
@@ -782,24 +778,27 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName, leaderName)
     frame:SetScript("OnDragStart", function() this:StartMoving() end)
     frame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
     
-    -- Title: "Ready Check"
-    local title = frame:CreateFontString(nil, "OVERLAY")
-    title:SetPoint("TOP", frame, "TOP", 0, -15)
-    title:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
-    title:SetTextColor(1, 0.82, 0)
-    title:SetText(TDT_L("UI_READY_CHECK_TITLE"))
+    -- Title
+    local titleText = frame:CreateFontString(nil, "OVERLAY")
+    titleText:SetPoint("TOP", frame, "TOP", 0, -15)
+    titleText:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
+    titleText:SetTextColor(1, 0.82, 0)
+    titleText:SetText(title)
     
     -- ============================================================================
     -- PLAYER STATUS CIRCLES (Top section)
     -- ============================================================================
     
-    -- Collect all group members with leader always first
+    -- Collect all group members with initiator always first (if provided)
     local groupMembers = {}
     local playerName = UnitName("player")
     local isLeader = self:isGroupLeader()
     
-    -- Add leader first (if leader is player, add player first)
-    if isLeader and playerName then
+    -- Add initiator first if provided
+    if initiatorName then
+        table.insert(groupMembers, initiatorName)
+    elseif isLeader and playerName then
+        -- Fallback: Add leader first if no initiator specified
         table.insert(groupMembers, playerName)
     end
     
@@ -807,171 +806,207 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName, leaderName)
     if GetNumRaidMembers() > 0 then
         for i = 1, GetNumRaidMembers() do
             local name = UnitName("raid" .. i)
-            if name and name ~= playerName then
+            if name and name ~= (initiatorName or playerName) then
                 table.insert(groupMembers, name)
             end
         end
     elseif GetNumPartyMembers() > 0 then
         for i = 1, GetNumPartyMembers() do
             local name = UnitName("party" .. i)
-            if name and (not isLeader or name ~= playerName) then
+            if name and name ~= (initiatorName or playerName) then
                 table.insert(groupMembers, name)
             end
         end
     end
     
-    -- If player is not leader, add player to list (non-leaders see their own ready check)
-    if not isLeader and playerName then
+    -- If player is not in list yet, add them
+    local playerInList = false
+    for _, name in ipairs(groupMembers) do
+        if name == playerName then
+            playerInList = true
+            break
+        end
+    end
+    if not playerInList and playerName then
         table.insert(groupMembers, playerName)
     end
     
     local numMembers = table.getn(groupMembers)
-    local circleSize = 60
-    local spacing = 10
-    local totalWidth = numMembers * circleSize + (numMembers - 1) * spacing
-    local startX = -totalWidth / 2 + circleSize / 2
-    
     frame.playerCircles = {}
+    frame.responsesTable = responsesTable  -- Store responses table for OnUpdate handler
     
-    for i, playerName in ipairs(groupMembers) do
-        local xOffset = startX + (i - 1) * (circleSize + spacing)
+    -- Choose display mode based on group size
+    if numMembers > 5 then
+        -- ====================================================================
+        -- COMPACT MODE (6+ players): Names only, 5 per row
+        -- ====================================================================
+        local namesPerRow = 5
+        local nameWidth = 70
+        local nameSpacing = 10
+        local rowHeight = 20
+        local startY = -50
+        local horizontalPadding = 10
         
-        -- Portrait frame
-        local circle = CreateFrame("Frame", nil, frame)
-        circle:SetWidth(circleSize)
-        circle:SetHeight(circleSize)
-        circle:SetPoint("TOP", frame, "TOP", xOffset, -50)
-        
-        -- Portrait texture
-        local icon = circle:CreateTexture(nil, "ARTWORK")
-        icon:SetAllPoints(circle)
-        
-        -- Get class info for this player
-        local unitId = nil
-        if playerName == UnitName("player") then
-            unitId = "player"
-        elseif GetNumRaidMembers() > 0 then
-            for j = 1, GetNumRaidMembers() do
-                if UnitName("raid" .. j) == playerName then
-                    unitId = "raid" .. j
-                    break
-                end
-            end
-        elseif GetNumPartyMembers() > 0 then
-            for j = 1, GetNumPartyMembers() do
-                if UnitName("party" .. j) == playerName then
-                    unitId = "party" .. j
-                    break
-                end
-            end
+        for i, memberName in ipairs(groupMembers) do
+            local row = math.floor((i - 1) / namesPerRow)
+            local col = mod(i - 1, namesPerRow)
+            
+            local totalWidth = namesPerRow * nameWidth + (namesPerRow - 1) * nameSpacing
+            local xOffset = -(totalWidth / 2) + col * (nameWidth + nameSpacing) + horizontalPadding
+            local yOffset = startY - row * rowHeight
+            
+            local nameText = frame:CreateFontString(nil, "OVERLAY")
+            nameText:SetPoint("TOPLEFT", frame, "TOP", xOffset, yOffset)
+            nameText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+            nameText:SetWidth(nameWidth)
+            nameText:SetHeight(rowHeight)
+            nameText:SetJustifyH("LEFT")
+            nameText:SetJustifyV("TOP")
+            nameText:SetText(memberName)
+            nameText:SetTextColor(1, 1, 0) -- Yellow = pending
+            
+            local fakeCircle = CreateFrame("Frame", nil, frame)
+            fakeCircle:SetWidth(1)
+            fakeCircle:SetHeight(1)
+            fakeCircle:Hide()
+            fakeCircle.nameText = nameText
+            fakeCircle.isCompactMode = true
+            
+            frame.playerCircles[memberName] = fakeCircle
         end
-        
-        if unitId then
-            SetPortraitTexture(icon, unitId)
-        else
-            icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-        end
-        
-        circle.icon = icon
-        
-        -- Status indicator circle (below portrait, overlapping bottom)
-        local statusCircleSize = 68
-        local statusCircle = CreateFrame("Frame", nil, frame)
-        statusCircle:SetWidth(statusCircleSize)
-        statusCircle:SetHeight(statusCircleSize)
-        statusCircle:SetPoint("TOP", circle, "BOTTOM", 10, 10)
-        statusCircle:SetFrameLevel(circle:GetFrameLevel() + 1)
-        
-        -- Status icon inside circle (like minimap button - FIRST, so it's behind border)
-        local statusIcon = statusCircle:CreateTexture(nil, "BACKGROUND")
-        statusIcon:SetWidth(statusCircleSize - 43)
-        statusIcon:SetHeight(statusCircleSize - 43)
-        statusIcon:SetPoint("CENTER", statusCircle, "CENTER", -14, 15)
-        statusIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-        statusIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92) -- Crop edges
-        circle.statusIcon = statusIcon
-        
-        -- Colored border ring (AFTER icon, so it overlays)
-        local border = statusCircle:CreateTexture(nil, "OVERLAY")
-        border:SetPoint("CENTER", statusCircle, "CENTER", 0, 0)
-        border:SetWidth(statusCircleSize)
-        border:SetHeight(statusCircleSize)
-        border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-        border:SetVertexColor(1, 1, 0, 1) -- Yellow = pending
-        circle.statusBg = border
-        
-        -- Name text below portrait
-        local nameText = circle:CreateFontString(nil, "OVERLAY")
-        nameText:SetPoint("TOP", circle, "BOTTOM", 0, -30)
-        nameText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-        nameText:SetTextColor(1, 1, 1)
-        nameText:SetText(playerName)
-        
-        frame.playerCircles[playerName] = circle
-    end
-    
-    -- Update initial status (leader should be green immediately)
-    self:updateReadyCheckCircles(frame)
-    
-    -- ============================================================================
-    -- QUESTION SECTION (Middle)
-    -- ============================================================================
-    
-    local questionY = -170 - (numMembers > 3 and 20 or 0) -- Adjust if many players
-    
-    -- Question text with dungeon name
-    local questionText = frame:CreateFontString(nil, "OVERLAY")
-    questionText:SetPoint("TOP", frame, "TOP", 0, questionY)
-    questionText:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
-    questionText:SetTextColor(1, 1, 1)
-    questionText:SetWidth(380)
-    
-    -- Use provided dungeonName parameter (from leader) or fallback to own selection
-    local dungeonDisplayName = ""
-    if dungeonName and dungeonName ~= "" then
-        dungeonDisplayName = dungeonName
-    elseif self.selectedDungeon then
-        local dungeonData = self.DUNGEON_DATA[self.selectedDungeon]
-        dungeonDisplayName = dungeonData and dungeonData.name or self.selectedDungeon
-    end
-    
-    if dungeonDisplayName ~= "" then
-        questionText:SetText(string.format(TDT_L("UI_READY_CHECK_DUNGEON"), dungeonDisplayName))
     else
-        questionText:SetText(TDT_L("UI_READY_CHECK_QUESTION"))
+        -- ====================================================================
+        -- PORTRAIT MODE (1-5 players): Original display with portraits
+        -- ====================================================================
+        local circleSize = 60
+        local spacing = 10
+        local totalWidth = numMembers * circleSize + (numMembers - 1) * spacing
+        local startX = -totalWidth / 2 + circleSize / 2
+        
+        for i, memberName in ipairs(groupMembers) do
+            local xOffset = startX + (i - 1) * (circleSize + spacing)
+            
+            local circle = CreateFrame("Frame", nil, frame)
+            circle:SetWidth(circleSize)
+            circle:SetHeight(circleSize)
+            circle:SetPoint("TOP", frame, "TOP", xOffset, -50)
+            
+            local icon = circle:CreateTexture(nil, "ARTWORK")
+            icon:SetAllPoints(circle)
+            
+            local unitId = nil
+            if memberName == UnitName("player") then
+                unitId = "player"
+            elseif GetNumRaidMembers() > 0 then
+                for j = 1, GetNumRaidMembers() do
+                    if UnitName("raid" .. j) == memberName then
+                        unitId = "raid" .. j
+                        break
+                    end
+                end
+            elseif GetNumPartyMembers() > 0 then
+                for j = 1, GetNumPartyMembers() do
+                    if UnitName("party" .. j) == memberName then
+                        unitId = "party" .. j
+                        break
+                    end
+                end
+            end
+            
+            if unitId then
+                SetPortraitTexture(icon, unitId)
+            else
+                icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            end
+            
+            circle.icon = icon
+            
+            local statusCircleSize = 68
+            local statusCircle = CreateFrame("Frame", nil, frame)
+            statusCircle:SetWidth(statusCircleSize)
+            statusCircle:SetHeight(statusCircleSize)
+            statusCircle:SetPoint("TOP", circle, "BOTTOM", 10, 10)
+            statusCircle:SetFrameLevel(circle:GetFrameLevel() + 1)
+            
+            local statusIcon = statusCircle:CreateTexture(nil, "BACKGROUND")
+            statusIcon:SetWidth(statusCircleSize - 43)
+            statusIcon:SetHeight(statusCircleSize - 43)
+            statusIcon:SetPoint("CENTER", statusCircle, "CENTER", -14, 15)
+            statusIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            circle.statusIcon = statusIcon
+            
+            local border = statusCircle:CreateTexture(nil, "OVERLAY")
+            border:SetPoint("CENTER", statusCircle, "CENTER", 0, 0)
+            border:SetWidth(statusCircleSize)
+            border:SetHeight(statusCircleSize)
+            border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+            border:SetVertexColor(1, 1, 0, 1) -- Yellow = pending
+            circle.statusBg = border
+            
+            local nameText = circle:CreateFontString(nil, "OVERLAY")
+            nameText:SetPoint("TOP", circle, "BOTTOM", 0, -30)
+            nameText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+            nameText:SetTextColor(1, 1, 1)
+            nameText:SetText(memberName)
+            
+            frame.playerCircles[memberName] = circle
+        end
+    end
+    
+    -- Update initial status
+    self:updateVoteCircles(frame, responsesTable)
+    
+    -- ============================================================================
+    -- DUNGEON NAME SECTION (Middle) - only for ready_check
+    -- ============================================================================
+    
+    local dungeonY = -160 - (numMembers > 3 and 20 or 0)
+    
+    if dungeonName and dungeonName ~= "" then
+        local dungeonNameText = frame:CreateFontString(nil, "OVERLAY")
+        dungeonNameText:SetPoint("TOP", frame, "TOP", 0, dungeonY)
+        dungeonNameText:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
+        dungeonNameText:SetTextColor(1, 0.82, 0)
+        dungeonNameText:SetWidth(380)
+        dungeonNameText:SetText(dungeonName)
     end
     
     -- ============================================================================
     -- BUTTONS (Bottom)
     -- ============================================================================
     
-    local buttonY = 80
+    local buttonY = 40
     
-    -- Yes button (left of center)
     local yesBtn = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
     yesBtn:SetWidth(140)
     yesBtn:SetHeight(35)
     yesBtn:SetPoint("RIGHT", frame, "BOTTOM", -10, buttonY)
     yesBtn:SetText(TDT_L("YES"))
     yesBtn:SetScript("OnClick", function()
-        local tdt = TurtleDungeonTimer:getInstance()
-        tdt:respondToReadyCheck(true)
-        -- Don't hide frame - keep it open to show responses
+        if onYesCallback then
+            onYesCallback()
+        end
+        -- Mark as responded and hide buttons
+        this:GetParent().hasResponded = true
+        this:Hide()
+        this:GetParent().noButton:Hide()
     end)
     
-    -- No button (right of center)
     local noBtn = CreateFrame("Button", nil, frame, "GameMenuButtonTemplate")
     noBtn:SetWidth(140)
     noBtn:SetHeight(35)
     noBtn:SetPoint("LEFT", frame, "BOTTOM", 10, buttonY)
     noBtn:SetText(TDT_L("UI_NO_BUTTON"))
     noBtn:SetScript("OnClick", function()
-        local tdt = TurtleDungeonTimer:getInstance()
-        tdt:respondToReadyCheck(false)
-        -- Don't hide frame - keep it open to show responses
+        if onNoCallback then
+            onNoCallback()
+        end
+        -- Mark as responded and hide buttons
+        this:GetParent().hasResponded = true
+        this:Hide()
+        this:GetParent().yesButton:Hide()
     end)
     
-    -- Store button references for hiding after response
     frame.yesButton = yesBtn
     frame.noButton = noBtn
     
@@ -979,24 +1014,23 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName, leaderName)
     -- TIMER BAR (Bottom)
     -- ============================================================================
     
-    -- Progress bar background
+    local progressBarWidth = 300
+    
     local progressBg = frame:CreateTexture(nil, "BACKGROUND")
-    progressBg:SetPoint("BOTTOM", frame, "BOTTOM", 0, 100)
-    progressBg:SetWidth(380)
+    progressBg:SetPoint("BOTTOM", frame, "BOTTOM", 0, 80)
+    progressBg:SetWidth(progressBarWidth)
     progressBg:SetHeight(18)
     progressBg:SetTexture(0, 0, 0, 0.8)
     
-    -- Progress bar
-    local progressBar = frame:CreateTexture(nil, "ARTWORK")
+    local progressBar = frame:CreateTexture(nil, "LEFT")
     progressBar:SetPoint("LEFT", progressBg, "LEFT", 0, 0)
-    progressBar:SetWidth(380)
+    progressBar:SetWidth(progressBarWidth)
     progressBar:SetHeight(18)
     progressBar:SetTexture(0, 0.8, 0, 0.6)
     frame.progressBar = progressBar
     
-    -- Timer text (above buttons)
     local timerText = frame:CreateFontString(nil, "OVERLAY")
-    timerText:SetPoint("BOTTOM", yesBtn, "TOP", 0, 10)
+    timerText:SetPoint("CENTER", progressBg, "CENTER", 0, 0)
     timerText:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     timerText:SetTextColor(1, 1, 1)
     timerText:SetText("30s")
@@ -1006,102 +1040,208 @@ function TurtleDungeonTimer:showReadyCheckPrompt(dungeonName, leaderName)
     -- UPDATE LOGIC
     -- ============================================================================
     
-    -- Update timer and check for completion
     frame.startTime = GetTime()
     frame.duration = 30
     frame.hasResponded = false
+    frame.responsesTable = responsesTable
+    
+    -- If player already responded, mark as responded and hide buttons
+    if responsesTable and responsesTable[UnitName("player")] ~= nil then
+        frame.hasResponded = true
+        yesBtn:Hide()
+        noBtn:Hide()
+    end
     
     frame:SetScript("OnUpdate", function()
-        local tdt = TurtleDungeonTimer:getInstance()
         local elapsed = GetTime() - this.startTime
         local remaining = this.duration - elapsed
         
         if remaining <= 0 then
-            -- Timeout - auto-close
-            if not this.hasResponded then
-                tdt:respondToReadyCheck(false)
+            -- Timeout
+            if not this.hasResponded and onNoCallback then
+                onNoCallback()  -- Auto-decline on timeout
             end
             this:Hide()
             return
         end
         
-        -- Update progress bar
+        -- Update timer bar
         local progress = remaining / this.duration
-        this.progressBar:SetWidth(380 * progress)
+        this.progressBar:SetWidth(progressBarWidth * progress)
+        this.timerText:SetText(string.format("%.0fs", remaining))
         
-        -- Update timer text
-        this.timerText:SetText(math.floor(remaining) .. "s")
-        
-        -- Change color based on remaining time
-        if remaining < 10 then
-            this.progressBar:SetTexture(0.8, 0, 0, 0.6) -- Red
-        elseif remaining < 20 then
-            this.progressBar:SetTexture(0.8, 0.8, 0, 0.6) -- Yellow
+        -- Update player circles
+        if this.responsesTable then
+            TurtleDungeonTimer:getInstance():updateVoteCircles(this, this.responsesTable)
         end
         
-        -- Update player status circles
-        tdt:updateReadyCheckCircles(this)
-        
-        -- Check if all have responded (for all players, not just leader)
-        local allResponded = true
-        local expectedCount = tdt:getGroupSize()
-        local responseCount = 0
-        
-        for playerName, _ in pairs(this.playerCircles) do
-            if tdt.readyCheckResponses[playerName] ~= nil then
-                responseCount = responseCount + 1
+        -- Check if all players have responded
+        if this.responsesTable and this.playerCircles then
+            local allResponded = true
+            for playerName, _ in pairs(this.playerCircles) do
+                if this.responsesTable[playerName] == nil then
+                    allResponded = false
+                    break
+                end
+            end
+            
+            -- Auto-close after 3 seconds if all responded
+            if allResponded then
+                if not this.autoCloseTimer then
+                    this.autoCloseTimer = GetTime()
+                end
+                
+                local autoCloseElapsed = GetTime() - this.autoCloseTimer
+                if autoCloseElapsed >= 3 then
+                    this:Hide()
+                    return
+                end
             else
-                allResponded = false
+                -- Reset timer if not all responded yet
+                this.autoCloseTimer = nil
             end
-        end
-        
-        -- Alternative check: use expectedCount
-        if responseCount >= expectedCount then
-            allResponded = true
-        end
-        
-        if allResponded then
-            -- All responded - close after 2 seconds
-            if not this.closeTimer then
-                this.closeTimer = GetTime()
-            elseif GetTime() - this.closeTimer > 2 then
-                this:Hide()
-                return
-            end
-        else
-            -- Reset close timer if not all responded yet
-            this.closeTimer = nil
         end
     end)
     
     frame:Show()
-    self.readyCheckPromptFrame = frame
+    
+    -- Store frame reference if specified
+    if frameRefName then
+        self[frameRefName] = frame
+    end
+    
+    return frame
 end
 
--- Update visual status of player circles
-function TurtleDungeonTimer:updateReadyCheckCircles(frame)
-    if not frame or not frame.playerCircles then
+-- Update visual status of player circles in vote prompt
+function TurtleDungeonTimer:updateVoteCircles(frame, responsesTable)
+    if not frame or not frame.playerCircles or not responsesTable then
         return
     end
     
     for playerName, circle in pairs(frame.playerCircles) do
-        local response = self.readyCheckResponses[playerName]
+        local response = responsesTable[playerName]
         
-        if response == true then
-            -- Ready: Green ring with melee damage icon (checkmark-like)
-            circle.statusBg:SetVertexColor(0, 1, 0, 1)
-            circle.statusIcon:SetTexture("Interface\\Icons\\Ability_MeleeDamage")
-        elseif response == false then
-            -- Not Ready: Red ring with dual wield icon (crossed swords)
-            circle.statusBg:SetVertexColor(1, 0, 0, 1)
-            circle.statusIcon:SetTexture("Interface\\Icons\\Ability_DualWield")
+        if circle.isCompactMode then
+            -- Compact mode: Just update text color
+            if circle.nameText then
+                if response == true then
+                    circle.nameText:SetTextColor(0, 1, 0) -- Green
+                elseif response == false then
+                    circle.nameText:SetTextColor(1, 0, 0) -- Red
+                else
+                    circle.nameText:SetTextColor(1, 1, 0) -- Yellow
+                end
+            end
         else
-            -- Pending: Yellow ring with question mark
-            circle.statusBg:SetVertexColor(1, 1, 0, 1)
-            circle.statusIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+            -- Portrait mode: Update icon and border
+            if response == true then
+                if circle.statusIcon then
+                    circle.statusIcon:SetTexture("Interface\\Icons\\Ability_MeleeDamage")
+                end
+                if circle.statusBg then
+                    circle.statusBg:SetVertexColor(0, 1, 0, 1) -- Green
+                end
+            elseif response == false then
+                if circle.statusIcon then
+                    circle.statusIcon:SetTexture("Interface\\Icons\\Ability_DualWield")
+                end
+                if circle.statusBg then
+                    circle.statusBg:SetVertexColor(1, 0, 0, 1) -- Red
+                end
+            else
+                if circle.statusIcon then
+                    circle.statusIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+                end
+                if circle.statusBg then
+                    circle.statusBg:SetVertexColor(1, 1, 0, 1) -- Yellow
+                end
+            end
         end
-        circle.statusIcon:Show()
     end
+end
+
+function TurtleDungeonTimer:startReadyCheck()
+    self.preparationState = "READY_CHECK"
+    self.readyCheckResponses = {}
+    self.readyCheckStarted = GetTime()
+    
+    -- Broadcast ready check request with dungeon name + variant to all group members
+    local dungeonKey = ""
+    local variantName = ""
+    if self.pendingDungeonSelection then
+        -- Use pending dungeon selection (not yet set as selectedDungeon)
+        dungeonKey = self.pendingDungeonSelection
+        variantName = self.pendingVariantSelection or ""
+    end
+    -- Ensure dungeonKey is never nil
+    dungeonKey = dungeonKey or ""
+    
+    -- Add World Buff info to sync message (format: "dungeonKey;variantName;wbFlag")
+    local wbFlag = "0" -- Default: no World Buff info
+    if self.runWithWorldBuffs ~= nil then
+        wbFlag = self.runWithWorldBuffs and "1" or "2" -- 1 = with WBs, 2 = without WBs
+    end
+    local syncData = dungeonKey .. ";" .. variantName .. ";" .. wbFlag
+    
+    self:sendSyncMessage("READY_CHECK_START", syncData)
+    
+    -- Auto-respond for self (leader) - leader is always ready
+    self.readyCheckResponses[UnitName("player")] = true
+    
+    -- Show ready check prompt for leader too (they should see the window)
+    self:showReadyCheckPrompt(dungeonKey, variantName, UnitName("player"))
+    
+    -- Timeout after 30 seconds
+    self:scheduleTimer(function()
+        if self.preparationState == "READY_CHECK" then
+            self:finishReadyCheck()
+        end
+    end, 30, false)
+end
+
+-- Show the ready check prompt to a player (wrapper for showGroupVotePrompt)
+-- dungeonKey: optional parameter with dungeon key (from sync message)
+-- variantName: optional parameter with variant name (from sync message)
+-- leaderName: name of the player who started the ready check
+function TurtleDungeonTimer:showReadyCheckPrompt(dungeonKey, variantName, leaderName)
+    -- Build formatted dungeon name with variant
+    local dungeonDisplayName = ""
+    local localDungeonKey = dungeonKey
+    local localVariantName = variantName
+    
+    -- Use provided parameters (from leader) or fallback to own selection
+    if not localDungeonKey or localDungeonKey == "" then
+        localDungeonKey = self.selectedDungeon or self.pendingDungeonSelection
+        localVariantName = self.selectedVariant or self.pendingVariantSelection
+    end
+    
+    if localDungeonKey and localDungeonKey ~= "" then
+        local dungeonData = self.DUNGEON_DATA[localDungeonKey]
+        if dungeonData then
+            dungeonDisplayName = dungeonData.name or localDungeonKey
+            if localVariantName and localVariantName ~= "Default" and localVariantName ~= "" then
+                dungeonDisplayName = dungeonDisplayName .. " - " .. localVariantName
+            end
+        end
+    end
+    
+    -- Use the generic group vote prompt
+    self:showGroupVotePrompt(
+        "ready_check",
+        TDT_L("UI_READY_CHECK_TITLE"),
+        dungeonDisplayName,
+        leaderName,
+        self.readyCheckResponses,
+        function() self:respondToReadyCheck(true) end,
+        function() self:respondToReadyCheck(false) end,
+        "readyCheckPromptFrame"
+    )
+end
+
+-- Alias for backwards compatibility (redirects to new generic function)
+function TurtleDungeonTimer:updateReadyCheckCircles(frame)
+    self:updateVoteCircles(frame, self.readyCheckResponses)
 end
 
 function TurtleDungeonTimer:respondToReadyCheck(isReady)
@@ -1124,7 +1264,7 @@ function TurtleDungeonTimer:respondToReadyCheck(isReady)
         end
         
         -- Update circles immediately to show own response
-        self:updateReadyCheckCircles(self.readyCheckPromptFrame)
+        self:updateVoteCircles(self.readyCheckPromptFrame, self.readyCheckResponses)
     end
     
     -- Check if all members have responded (if leader)
@@ -1140,8 +1280,10 @@ function TurtleDungeonTimer:onReadyCheckResponse(sender, isReady)
     
     self.readyCheckResponses[sender] = (isReady == "1")
     
-    -- Check if all members have responded
-    self:checkReadyCheckComplete()
+    -- Only leader should check if all members have responded
+    if self:isGroupLeader() then
+        self:checkReadyCheckComplete()
+    end
 end
 
 function TurtleDungeonTimer:checkReadyCheckComplete()
@@ -1177,22 +1319,24 @@ function TurtleDungeonTimer:finishReadyCheck()
     
     -- Only show errors, not successful ready checks
     local allReady = true
-    local notReadyPlayers = {}
+    local notReadyPlayers = {}  -- Initialize as empty table
     
     -- Check self
     local selfReady = self.readyCheckResponses[UnitName("player")]
+    local playerName = UnitName("player")
+    
     if selfReady == false then
         if isLeader then
-            DEFAULT_CHAT_FRAME:AddMessage("  |cffff0000✗|r " .. UnitName("player") .. " (Not Ready)", 1, 0, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("  |cffff0000✗|r " .. playerName .. " (Not Ready)", 1, 0, 0)
         end
         allReady = false
-        table.insert(notReadyPlayers, UnitName("player"))
+        table.insert(notReadyPlayers, playerName)
     elseif selfReady ~= true then
         if isLeader then
-            DEFAULT_CHAT_FRAME:AddMessage("  |cffff9900?|r " .. UnitName("player") .. " " .. TDT_L("PREP_NO_RESPONSE"), 1, 0.6, 0)
+            DEFAULT_CHAT_FRAME:AddMessage("  |cffff9900?|r " .. playerName .. " " .. TDT_L("PREP_NO_RESPONSE"), 1, 0.6, 0)
         end
         allReady = false
-        table.insert(notReadyPlayers, UnitName("player"))
+        table.insert(notReadyPlayers, playerName)
     end
     
     -- Check group members
@@ -1257,18 +1401,21 @@ function TurtleDungeonTimer:finishReadyCheck()
         self:executeReset()
     else
         -- Preparation failed - build list of not ready players
-        self.preparationState = "FAILED"
+        self.preparationState = nil  -- Reset to nil so button shows "Start" again
         if isLeader then
             local playerList = table.concat(notReadyPlayers, ", ")
             DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Ready check failed - Players not ready: " .. playerList, 1, 0, 0)
             -- Only broadcast to group, don't show local message again
             self:broadcastPreparationFailed("Players not ready: " .. playerList)
         end
+        
+        -- Update button to show "Start" again
+        self:updateStartButton()
     end
 end
 
 function TurtleDungeonTimer:failPreparation(reason)
-    self.preparationState = "FAILED"
+    self.preparationState = nil  -- Reset to nil so button shows "Start" again
     
     -- Check if we're the leader
     local isLeader = false
@@ -1284,6 +1431,68 @@ function TurtleDungeonTimer:failPreparation(reason)
         self:broadcastPreparationFailed(reason)
     end
     -- Non-leaders will receive the message via sync (onSyncPreparationFailed)
+    
+    -- Update button to show "Start" again
+    self:updateStartButton()
+end
+
+-- ============================================================================
+-- PREPARATION ABORT DIALOG (called when aborting preparation before run starts)
+-- ============================================================================
+function TurtleDungeonTimer:showPreparationAbortDialog()
+    local dialog = CreateFrame("Frame", nil, UIParent)
+    dialog:SetWidth(300)
+    dialog:SetHeight(140)
+    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
+    dialog:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = {left = 11, right = 12, top = 12, bottom = 11}
+    })
+    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+    dialog:EnableMouse(true)
+    
+    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", dialog, "TOP", 0, -15)
+    title:SetText(TDT_L("UI_ABORT_RUN_TITLE"))
+    title:SetTextColor(1, 0.82, 0)
+    
+    local message = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    message:SetPoint("TOP", title, "BOTTOM", 0, -15)
+    message:SetWidth(260)
+    message:SetText(TDT_L("UI_ABORT_PREPARATION_MESSAGE"))
+    message:SetJustifyH("CENTER")
+    
+    local yesButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    yesButton:SetWidth(100)
+    yesButton:SetHeight(30)
+    yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
+    yesButton:SetText(TDT_L("YES"))
+    yesButton:SetScript("OnClick", function()
+        -- Reset preparation state
+        local timer = TurtleDungeonTimer:getInstance()
+        timer.preparationState = nil
+        timer.pendingDungeonSelection = nil
+        timer.pendingVariantSelection = nil
+        timer.readyCheckResponses = {}
+        timer:updateStartButton()
+        dialog:Hide()
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_ABORTED"), 0, 1, 0)
+    end)
+    
+    local noButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
+    noButton:SetWidth(100)
+    noButton:SetHeight(30)
+    noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
+    noButton:SetText(TDT_L("UI_NO_BUTTON"))
+    noButton:SetScript("OnClick", function()
+        dialog:Hide()
+    end)
+    
+    dialog:Show()
 end
 
 -- ============================================================================
@@ -1575,11 +1784,20 @@ end
 -- ============================================================================
 
 function TurtleDungeonTimer:onSyncPrepareReady(sender)
+    -- Debug output
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFFFF00FF[TDT Debug]|r onSyncPrepareReady called. sender=%s, player=%s, alreadyShown=%s", tostring(sender), tostring(UnitName("player")), tostring(self.prepareReadyMessageShown)), 1, 1, 0)
+    end
+    
     -- Leader has successfully reset, we're ready too
     self.preparationState = "READY"
     self.countdownTriggered = false
     
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
+    -- Only show message once per preparation cycle
+    if not self.prepareReadyMessageShown then
+        self.prepareReadyMessageShown = true
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r " .. TDT_L("PREP_RUN_READY_MSG"), 0, 1, 0)
+    end
     
     -- Update button to show "Abort" since preparation is now ready
     self:updateStartButton()

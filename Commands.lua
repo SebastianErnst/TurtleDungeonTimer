@@ -27,13 +27,6 @@ SlashCmdList["TURTLEDUNGEONTIMER"] = function(msg)
         -- Quick debug disable
         TurtleDungeonTimerDB.debug = false
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Debug mode disabled!", 0, 1, 0)
-    elseif msg == "trash" then
-        -- Open trash counter window (available to all players)
-        if TDTTrashScanner and TDTTrashScanner.showListWindow then
-            TDTTrashScanner:showListWindow()
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT]|r Trash scanner not available!", 1, 0, 0)
-        end
     -- AUTOSCANNER DISABLED - UNCOMMENT TO RE-ENABLE
     -- elseif msg == "autoscan" then
     --     -- Open auto trash scanner window
@@ -52,11 +45,26 @@ SlashCmdList["TURTLEDUNGEONTIMER"] = function(msg)
     --     if TDTAutoTrashScan then
     --         TDTAutoTrashScan:disable()
     --     end
+    elseif msg == "dummyhistory" then
+        -- Generate dummy history data for testing (restricted command)
+        if playerName ~= "Zasamel" then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT]|r Access denied. Debug commands are restricted.", 1, 0, 0)
+            return
+        end
+        timer:generateDummyHistory()
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Generated dummy history data!", 0, 1, 0)
+    elseif msg == "clearhistory" then
+        -- Clear history (restricted command)
+        if playerName ~= "Zasamel" then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[TDT]|r Access denied. Debug commands are restricted.", 1, 0, 0)
+            return
+        end
+        TurtleDungeonTimerDB.history = {}
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r History cleared!", 0, 1, 0)
     elseif msg == "help" then
         -- Show help message
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Available commands:", 0, 1, 0)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt|r - Toggle timer window", 1, 1, 1)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt trash|r - Open manual trash scanner", 1, 1, 1)
         DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt version|r - Show addon version", 1, 1, 1)
         -- DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscan|r - Open auto trash scanner", 1, 1, 1)
         -- DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00/tdt autoscanon/off|r - Toggle auto scanning", 1, 1, 1)

@@ -10,7 +10,15 @@ local WORLD_BUFFS = {
     ["Songflower Serenade"] = true,
     ["Fengus' Ferocity"] = true,
     ["Mol'dar's Moxie"] = true,
-    ["Slip'kik's Savvy"] = true
+    ["Slip'kik's Savvy"] = true,
+    ["Sayge's Dark Fortune of Agility"] = true,
+    ["Sayge's Dark Fortune of Intelligence"] = true,
+    ["Sayge's Dark Fortune of Spirit"] = true,
+    ["Sayge's Dark Fortune of Stamina"] = true,
+    ["Sayge's Dark Fortune of Strength"] = true,
+    ["Sayge's Dark Fortune of Armor"] = true,
+    ["Sayge's Dark Fortune of Resistance"] = true,
+    ["Sayge's Dark Fortune of Damage"] = true,
 }
 
 -- Create hidden tooltip for buff scanning
@@ -300,4 +308,9 @@ function TurtleDungeonTimer:getWorldBuffStatus()
         hasWorldBuffs = self.hasWorldBuffs or false,
         worldBuffPlayers = self.worldBuffPlayers or {}
     }
+end
+
+-- Get list of tracked world buffs
+function TurtleDungeonTimer:getTrackedWorldBuffs()
+    return WORLD_BUFFS
 end

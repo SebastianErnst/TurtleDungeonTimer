@@ -33,7 +33,6 @@ function TurtleDungeonTimer:createMinimapButton()
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
         GameTooltip:SetText("Turtle Dungeon Timer", 1, 1, 1)
         GameTooltip:AddLine("Left-Click: Toggle window", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Right-Click: Open menu", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     

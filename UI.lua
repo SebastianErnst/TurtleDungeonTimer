@@ -339,7 +339,13 @@ function TurtleDungeonTimer:createHeader()
         -- If abort mode, show abort confirmation dialog
         if shouldShowAbort then
             if timer:isGroupLeader() then
-                timer:showAbortConfirmationDialog()
+                -- If timer is running, show run abort confirmation
+                if timer.isRunning then
+                    timer:showAbortConfirmationDialog()
+                -- If in preparation (READY/COUNTDOWN), show preparation abort confirmation
+                elseif timer.preparationState == "READY" or timer.preparationState == "COUNTDOWN" then
+                    timer:showPreparationAbortDialog()
+                end
             else
                 DEFAULT_CHAT_FRAME:AddMessage(
                 "|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("PREP_LEADER_ONLY_ABORT"), 1, 0, 0)
@@ -917,26 +923,25 @@ end
 -- HISTORY MENU
 -- ============================================================================
 function TurtleDungeonTimer:showHistoryMenu(anchorFrame)
-    -- Create dropdown if it doesn't exist
-    if not self.historyDropdown then
-        self:createHistoryDropdown()
+    -- Create overlay if it doesn't exist
+    if not self.historyOverlay then
+        self:createHistoryOverlay()
     end
 
-    if self.historyDropdown:IsShown() then
-        self.historyDropdown:Hide()
+    if self.historyOverlay:IsShown() then
+        self.historyOverlay:Hide()
     else
-        self:populateHistoryDropdown()
-        self.historyDropdown:ClearAllPoints()
-        self.historyDropdown:SetPoint("TOPRIGHT", anchorFrame, "BOTTOMRIGHT", 0, 0)
-        self.historyDropdown:Show()
+        self:populateHistoryOverlay()
+        self.historyOverlay:Show()
     end
 end
 
-function TurtleDungeonTimer:createHistoryDropdown()
-    local dropdown = CreateFrame("Frame", nil, self.frame)
-    dropdown:SetWidth(280)
-    dropdown:SetHeight(250)
-    dropdown:SetBackdrop({
+function TurtleDungeonTimer:createHistoryOverlay()
+    local overlay = CreateFrame("Frame", nil, UIParent)
+    overlay:SetWidth(400)
+    overlay:SetHeight(500)
+    overlay:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    overlay:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true,
@@ -944,28 +949,44 @@ function TurtleDungeonTimer:createHistoryDropdown()
         edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    dropdown:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    dropdown:SetFrameStrata("DIALOG")
-    dropdown:Hide()
+    overlay:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+    overlay:SetFrameStrata("DIALOG")
+    overlay:EnableMouse(true)
+    overlay:SetMovable(true)
+    overlay:SetClampedToScreen(true)
+    overlay:RegisterForDrag("LeftButton")
+    overlay:SetScript("OnDragStart", function() this:StartMoving() end)
+    overlay:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+    overlay:Hide()
 
     -- Title
-    local title = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOP", dropdown, "TOP", 0, -10)
-    title:SetText("Run History")
+    local title = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", overlay, "TOP", 0, -15)
+    title:SetText(TDT_L("TOOLTIP_RUN_HISTORY"))
     title:SetTextColor(1, 0.82, 0)
 
+    -- Close button (X)
+    local closeBtn = CreateFrame("Button", nil, overlay)
+    closeBtn:SetWidth(20)
+    closeBtn:SetHeight(20)
+    closeBtn:SetPoint("TOPRIGHT", overlay, "TOPRIGHT", -10, -10)
+    local closeText = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    closeText:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
+    closeText:SetText("X")
+    closeText:SetTextColor(1, 0, 0)
+    closeBtn:SetScript("OnClick", function() overlay:Hide() end)
+
     -- Scroll frame for entries
-    local scrollFrame = CreateFrame("ScrollFrame", nil, dropdown)
-    scrollFrame:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 8, -30)
-    scrollFrame:SetWidth(264)
-    scrollFrame:SetHeight(210)
-    dropdown.scrollFrame = scrollFrame
+    local scrollFrame = CreateFrame("ScrollFrame", nil, overlay)
+    scrollFrame:SetPoint("TOPLEFT", overlay, "TOPLEFT", 10, -45)
+    scrollFrame:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", -10, 10)
+    overlay.scrollFrame = scrollFrame
 
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(264)
+    scrollChild:SetWidth(1)  -- Will be set based on scrollFrame width
     scrollChild:SetHeight(1)
     scrollFrame:SetScrollChild(scrollChild)
-    dropdown.scrollChild = scrollChild
+    overlay.scrollChild = scrollChild
 
     -- Enable scrolling
     scrollFrame:EnableMouseWheel()
@@ -980,52 +1001,58 @@ function TurtleDungeonTimer:createHistoryDropdown()
         end
     end)
 
-    dropdown.entries = {}
-    self.historyDropdown = dropdown
+    overlay.entries = {}
+    self.historyOverlay = overlay
 end
 
-function TurtleDungeonTimer:populateHistoryDropdown()
-    if not self.historyDropdown then return end
+function TurtleDungeonTimer:populateHistoryOverlay()
+    if not self.historyOverlay then return end
 
-    local dropdown = self.historyDropdown
-    local scrollChild = dropdown.scrollChild
+    local overlay = self.historyOverlay
+    local scrollChild = overlay.scrollChild
+    local scrollFrame = overlay.scrollFrame
 
     -- Clear previous entries
-    if dropdown.entries then
-        for i = 1, table.getn(dropdown.entries) do
-            dropdown.entries[i]:Hide()
-            dropdown.entries[i] = nil
+    if overlay.entries then
+        for i = 1, table.getn(overlay.entries) do
+            overlay.entries[i]:Hide()
+            overlay.entries[i] = nil
         end
     end
-    dropdown.entries = {}
+    overlay.entries = {}
 
     local history = TurtleDungeonTimerDB.history
     if not history or table.getn(history) == 0 then
         local noData = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         noData:SetPoint("CENTER", scrollChild, "TOP", 0, -50)
-        noData:SetText("No history yet")
+        noData:SetText(TDT_L("UI_NO_HISTORY"))
         noData:SetTextColor(0.5, 0.5, 0.5)
-        table.insert(dropdown.entries, noData)
+        table.insert(overlay.entries, noData)
+        scrollChild:SetHeight(100)
         return
     end
 
-    local rowHeight = 20
-    local numEntries = math.min(15, table.getn(history))
-    scrollChild:SetHeight(numEntries * rowHeight)
+    -- Set scrollChild width to match scrollFrame
+    local scrollWidth = scrollFrame:GetWidth()
+    scrollChild:SetWidth(scrollWidth)
+
+    local rowHeight = 25
+    local numEntries = table.getn(history)
+    scrollChild:SetHeight(numEntries * rowHeight + 10)
 
     for i = 1, numEntries do
         local entry = history[i]
-        local yOffset = -(i - 1) * rowHeight
+        local yOffset = -(i - 1) * rowHeight - 5
 
         local entryBtn = CreateFrame("Button", nil, scrollChild)
-        entryBtn:SetWidth(250)
+        entryBtn:SetWidth(scrollWidth - 10)
         entryBtn:SetHeight(rowHeight - 2)
-        entryBtn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, yOffset)
+        entryBtn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 5, yOffset)
 
         local entryText = entryBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         entryText:SetPoint("LEFT", entryBtn, "LEFT", 5, 0)
         entryText:SetJustifyH("LEFT")
-        entryText:SetWidth(240)
+        entryText:SetWidth(scrollWidth - 25)
 
         local timeStr = self:formatTime(entry.time)
         local statusStr = entry.completed == false and " [X]" or ""
@@ -1060,10 +1087,9 @@ function TurtleDungeonTimer:populateHistoryDropdown()
         end)
         entryBtn:SetScript("OnClick", function()
             TurtleDungeonTimer:getInstance():showHistoryDetails(capturedEntry)
-            dropdown:Hide()
         end)
 
-        table.insert(dropdown.entries, entryBtn)
+        table.insert(overlay.entries, entryBtn)
     end
 end
 
@@ -1073,10 +1099,10 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
         self.historyDetailFrame = nil
     end
 
-    local detailFrame = CreateFrame("Frame", nil, UIParent)
-    detailFrame:SetWidth(350)
-    detailFrame:SetHeight(400)
-    detailFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    if not self.historyOverlay then return end
+
+    local detailFrame = CreateFrame("Frame", nil, self.historyOverlay)
+    detailFrame:SetAllPoints(self.historyOverlay)
     detailFrame:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1086,13 +1112,8 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
     detailFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
-    detailFrame:SetFrameStrata("DIALOG")
+    detailFrame:SetFrameStrata("FULLSCREEN")  -- Higher than DIALOG (history overlay)
     detailFrame:EnableMouse(true)
-    detailFrame:SetMovable(true)
-    detailFrame:SetClampedToScreen(true)
-    detailFrame:RegisterForDrag("LeftButton")
-    detailFrame:SetScript("OnDragStart", function() this:StartMoving() end)
-    detailFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
     self.historyDetailFrame = detailFrame
 
     -- Title
@@ -1110,7 +1131,13 @@ function TurtleDungeonTimer:showHistoryDetails(entry)
     closeText:SetPoint("CENTER", closeBtn, "CENTER", 0, 0)
     closeText:SetText("X")
     closeText:SetTextColor(1, 0, 0)
-    closeBtn:SetScript("OnClick", function() detailFrame:Hide() end)
+    closeBtn:SetScript("OnClick", function()
+        detailFrame:Hide()
+        -- Show history overlay again when closing detail
+        if TurtleDungeonTimer:getInstance().historyOverlay then
+            TurtleDungeonTimer:getInstance().historyOverlay:Show()
+        end
+    end)
 
     -- Info text
     local infoText = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")

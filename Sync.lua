@@ -148,13 +148,13 @@ function TurtleDungeonTimer:syncFrameOnEvent()
                 DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFFFF00FF[TDT Debug]|r In grace period (%.1fs remaining), ignoring group change", remaining), 1, 1, 0)
             end
             -- Don't abort, just update UI
-        else
-            -- Abort active run if group composition changed (outside grace period)
-            if instance.isRunning or instance.isCountingDown then
-                instance:sendSyncMessage("ABORT_GROUP_CHANGE")
-                DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
-                instance:abortRun()
-            end
+        -- else
+            -- -- Abort active run if group composition changed (outside grace period)
+            -- if instance.isRunning or instance.isCountingDown then
+            --     instance:sendSyncMessage("ABORT_GROUP_CHANGE")
+            --     DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r " .. TDT_L("RUN_ABORTED_GROUP_CHANGE"), 1, 0, 0)
+            --     instance:abortRun()
+            -- end
         end
         
         -- Update addon user list and UI
@@ -536,8 +536,10 @@ function TurtleDungeonTimer:startAbortVote()
     self.abortVotes = {}
     self.abortInitiator = UnitName("player")
     self.abortVotes[UnitName("player")] = true
+    self.abortExecuted = false  -- Reset flag for new vote
     
-    TDT_Print("UI_ABORT_REQUEST_SENT", "success")
+    -- Show dialog for initiator (leader) as well
+    self:showAbortVoteDialog(UnitName("player"))
 end
 
 function TurtleDungeonTimer:voteAbort(vote)
@@ -547,9 +549,6 @@ function TurtleDungeonTimer:voteAbort(vote)
     
     local voteSyncStr = vote and "YES" or "NO"
     self:sendSyncMessage("ABORT_VOTE", playerName .. ";" .. voteSyncStr)
-    
-    local voteStr = vote and "|cff00ff00Ja|r" or "|cffff0000Nein|r"
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Abort Vote]|r " .. playerName .. ": " .. voteStr, 1, 1, 0)
     
     self:checkAbortVotes()
 end
@@ -578,23 +577,20 @@ function TurtleDungeonTimer:checkAbortVotes()
             self:abortRun()
             self.abortVotes = {}
             self.abortInitiator = nil
-            TDT_Print("UI_ABORT_BY_GROUP", "success")
+            -- Message shown via onSyncAbortExecute for all players
         else
             TDT_Print("UI_ABORT_DECLINED", "error")
             self:sendSyncMessage("ABORT_CANCEL")
             self.abortVotes = {}
             self.abortInitiator = nil
         end
-    else
-        TDT_Print("UI_ABORT_VOTE_STATUS", "success", votedMembers, totalAddonUsers, yesVotes)
     end
 end
 
 function TurtleDungeonTimer:onSyncAbortRequest(sender)
     self.abortInitiator = sender
     self.abortVotes = {}
-    
-    TDT_Print("UI_ABORT_PROPOSED", "success", sender)
+    self.abortExecuted = false  -- Reset flag for new vote
     
     if sender ~= UnitName("player") then
         self:showAbortVoteDialog(sender)
@@ -610,9 +606,6 @@ function TurtleDungeonTimer:onSyncAbortVote(data, sender)
     
     self.abortVotes[playerName] = (vote == "YES")
     
-    local voteStr = (vote == "YES") and "|cff00ff00Ja|r" or "|cffff0000Nein|r"
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Abort Vote]|r " .. playerName .. ": " .. voteStr, 1, 1, 0)
-    
     self:checkAbortVotes()
 end
 
@@ -623,20 +616,27 @@ function TurtleDungeonTimer:onSyncAbortCancel(sender)
     if self.abortVoteDialog then
         self.abortVoteDialog:Hide()
     end
-    
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Turtle Dungeon Timer]|r Abbruch-Vote wurde abgebrochen", 1, 0, 0)
 end
 
 function TurtleDungeonTimer:onSyncAbortExecute(sender)
+    -- Only show message once (prevent duplicate messages from multiple sync messages)
+    if not self.abortExecuted then
+        self.abortExecuted = true
+        TDT_Print("UI_ABORT_BY_GROUP_SYNC", "success")
+    end
+    
     self:abortRun()
     self.abortVotes = {}
     self.abortInitiator = nil
     
+    -- Hide dialog after 3 seconds delay
     if self.abortVoteDialog then
-        self.abortVoteDialog:Hide()
+        self:scheduleTimer(function()
+            if self.abortVoteDialog then
+                self.abortVoteDialog:Hide()
+            end
+        end, 3, false)
     end
-    
-    TDT_Print("UI_ABORT_BY_GROUP_SYNC", "success")
 end
 
 function TurtleDungeonTimer:onSyncAbortGroupChange(sender)
@@ -655,94 +655,20 @@ function TurtleDungeonTimer:onSyncAbortGroupChange(sender)
 end
 
 function TurtleDungeonTimer:showAbortVoteDialog(initiator)
-    if self.abortVoteDialog then
-        self.abortVoteDialog:Hide()
-    end
+    -- Build message with initiator name
+    local message = string.format(TDT_L("UI_ABORT_VOTE_MESSAGE"), initiator)
     
-    local dialog = CreateFrame("Frame", nil, UIParent)
-    dialog:SetWidth(300)
-    dialog:SetHeight(140)
-    dialog:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
-    dialog:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true,
-        tileSize = 32,
-        edgeSize = 32,
-        insets = {left = 11, right = 12, top = 12, bottom = 11}
-    })
-    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
-    dialog:EnableMouse(true)
-    dialog:SetMovable(true)
-    dialog:RegisterForDrag("LeftButton")
-    dialog:SetScript("OnDragStart", function() this:StartMoving() end)
-    dialog:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    self.abortVoteDialog = dialog
-    
-    -- Close button (X)
-    local closeBtn = CreateFrame("Button", nil, dialog)
-    closeBtn:SetWidth(20)
-    closeBtn:SetHeight(20)
-    closeBtn:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", -5, -5)
-    closeBtn:SetNormalTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Up")
-    closeBtn:SetPushedTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Down")
-    closeBtn:SetHighlightTexture("Interface\\\\Buttons\\\\UI-Panel-MinimizeButton-Highlight")
-    closeBtn:SetScript("OnClick", function()
-        local timer = TurtleDungeonTimer:getInstance()
-        timer:voteAbort(false)
-        dialog:Hide()
-    end)
-    
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", dialog, "TOP", 0, -15)
-    title:SetText(TDT_L("UI_ABORT_RUN_TITLE"))
-    title:SetTextColor(1, 0.82, 0)
-    
-    local message1 = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    message1:SetPoint("TOP", title, "BOTTOM", 0, -10)
-    message1:SetWidth(260)
-    message1:SetText(string.format(TDT_L("UI_ABORT_VOTE_MESSAGE"), initiator))
-    message1:SetJustifyH("CENTER")
-    
-    local message2 = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    message2:SetPoint("TOP", message1, "BOTTOM", 0, -10)
-    message2:SetWidth(260)
-    message2:SetText(TDT_L("UI_ABORT_VOTE_QUESTION"))
-    message2:SetJustifyH("CENTER")
-    
-    local yesButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
-    yesButton:SetWidth(100)
-    yesButton:SetHeight(30)
-    yesButton:SetPoint("BOTTOMLEFT", dialog, "BOTTOM", -105, 15)
-    yesButton:SetText(TDT_L("YES"))
-    yesButton:SetScript("OnClick", function()
-        local self = TurtleDungeonTimer:getInstance()
-        self:voteAbort(true)
-        self.abortVoteDialog:Hide()
-    end)
-    
-    local noButton = CreateFrame("Button", nil, dialog, "GameMenuButtonTemplate")
-    noButton:SetWidth(100)
-    noButton:SetHeight(30)
-    noButton:SetPoint("BOTTOMRIGHT", dialog, "BOTTOM", 105, 15)
-    noButton:SetText(TDT_L("no"))
-    noButton:SetScript("OnClick", function()
-        local self = TurtleDungeonTimer:getInstance()
-        self:voteAbort(false)
-        self.abortVoteDialog:Hide()
-    end)
-    
-    dialog.timeout = 30
-    dialog:SetScript("OnUpdate", function()
-        this.timeout = this.timeout - arg1
-        if this.timeout <= 0 then
-            local timer = TurtleDungeonTimer:getInstance()
-            timer:voteAbort(false)  -- Auto-vote "No" if timeout
-            dialog:Hide()
-        end
-    end)
-    
-    dialog:Show()
+    -- Use the generic group vote prompt
+    self:showGroupVotePrompt(
+        "abort_vote",
+        TDT_L("UI_ABORT_RUN_TITLE"),  -- Title only
+        message,  -- Message as dungeonName (middle section)
+        initiator,
+        self.abortVotes,
+        function() self:voteAbort(true) end,
+        function() self:voteAbort(false) end,
+        "abortVoteDialog"
+    )
 end
 
 function TurtleDungeonTimer:showAbortConfirmationDialog()
@@ -1019,18 +945,30 @@ function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
         return
     end
     
-    -- Parse data: format is "dungeonName;wbFlag"
-    local dungeonName = ""
+    -- Parse data: format is "dungeonKey;variantName;wbFlag"
+    local dungeonKey = ""
+    local variantName = ""
     local wbFlag = "0"
     
     if data and data ~= "" then
         -- Split by semicolon using string.find (WoW 1.12 compatible)
-        local semicolonPos = string.find(data, ";")
-        if semicolonPos then
-            dungeonName = string.sub(data, 1, semicolonPos - 1)
-            wbFlag = string.sub(data, semicolonPos + 1) or "0"
+        local firstSemicolon = string.find(data, ";")
+        if firstSemicolon then
+            dungeonKey = string.sub(data, 1, firstSemicolon - 1)
+            local remaining = string.sub(data, firstSemicolon + 1)
+            
+            -- Find second semicolon
+            local secondSemicolon = string.find(remaining, ";")
+            if secondSemicolon then
+                variantName = string.sub(remaining, 1, secondSemicolon - 1)
+                wbFlag = string.sub(remaining, secondSemicolon + 1) or "0"
+            else
+                -- Old format compatibility: only dungeonKey;wbFlag
+                variantName = ""
+                wbFlag = remaining or "0"
+            end
         else
-            dungeonName = data
+            dungeonKey = data
         end
     end
     
@@ -1043,8 +981,9 @@ function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
         self.runWithWorldBuffs = nil
     end
     
-    -- Store the dungeon name from leader (for later selection when clicking Yes)
-    self.pendingDungeonSelection = dungeonName
+    -- Store the dungeon + variant from leader (for later selection when clicking Yes)
+    self.pendingDungeonSelection = dungeonKey
+    self.pendingVariantSelection = variantName
     
     -- Reset ready check responses for new ready check
     self.readyCheckResponses = {}
@@ -1052,11 +991,11 @@ function TurtleDungeonTimer:onSyncReadyCheckStart(data, sender)
     self.readyCheckStarted = GetTime()
     
     if TurtleDungeonTimerDB.debug then
-        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Parsed dungeon: " .. tostring(dungeonName) .. ", WB flag: " .. tostring(self.runWithWorldBuffs), 1, 1, 0)
+        DEFAULT_CHAT_FRAME:AddMessage("[Debug] Parsed dungeon: " .. tostring(dungeonKey) .. ", variant: " .. tostring(variantName) .. ", WB flag: " .. tostring(self.runWithWorldBuffs), 1, 1, 0)
     end
     
-    -- Show ready check prompt to this player with the dungeon name
-    self:showReadyCheckPrompt(dungeonName, sender)
+    -- Show ready check prompt to this player with the dungeon name + variant
+    self:showReadyCheckPrompt(dungeonKey, variantName, sender)
 end
 
 function TurtleDungeonTimer:onSyncReadyCheckResponse(data, sender)
