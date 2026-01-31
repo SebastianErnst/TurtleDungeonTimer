@@ -593,6 +593,10 @@ function TurtleDungeonTimer:checkAddonPresence()
     allMembers[UnitName("player")] = true
     withAddon[UnitName("player")] = true
     
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r checkAddonPresence: Starting check", 1, 1, 0)
+    end
+    
     -- Add party/raid members
     if GetNumRaidMembers() > 0 then
         for i = 1, GetNumRaidMembers() do
@@ -611,8 +615,19 @@ function TurtleDungeonTimer:checkAddonPresence()
     end
     
     -- Check who has addon
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        local count = 0
+        for _ in pairs(self.playersWithAddon) do
+            count = count + 1
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r playersWithAddon table has " .. count .. " entries", 1, 1, 0)
+    end
+    
     for playerName, _ in pairs(self.playersWithAddon) do
         withAddon[playerName] = true
+        if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r ✓ " .. playerName .. " has addon", 0, 1, 0)
+        end
     end
     
     -- Find who doesn't have addon
@@ -1757,13 +1772,17 @@ end)
 function TurtleDungeonTimer:broadcastPrepareStart()
     self:sendSyncMessage("PREPARE_START")
     
-    -- Give others time to respond, then start checking
+    -- Give others time to respond, then start checking (3 seconds for network latency)
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.debug then
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF00FF[TDT Debug]|r Waiting 3 seconds for addon responses...", 1, 1, 0)
+    end
+    
     self:scheduleTimer(function()
         if self:checkAddonPresence() and self:checkVersionMatch() then
             -- Start ready check
             self:startReadyCheck()
         end
-    end, 1, false)
+    end, 3, false)
 end
 
 function TurtleDungeonTimer:broadcastCountdownStart(triggeredBy)
