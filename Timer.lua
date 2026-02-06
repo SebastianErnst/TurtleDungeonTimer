@@ -47,6 +47,11 @@ function TurtleDungeonTimer:start()
         self.deathCount = 0
         self.runCompleted = false  -- Reset completion flag for new run
         
+        -- Reset official run flag (will be set to false by preparation if needed)
+        if not self.isOfficialRun then
+            self.isOfficialRun = true  -- Reset to true for new run
+        end
+        
         -- Generate UUID for this run
         self.currentRunUUID = self:generateUUID()
         

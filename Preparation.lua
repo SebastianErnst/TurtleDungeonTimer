@@ -645,11 +645,13 @@ function TurtleDungeonTimer:checkAddonPresence()
     end
     
     if missingCount > 0 then
-        self:failPreparation(TDT_L("PREP_NOT_ALL_HAVE_ADDON"))
-        return false
+        -- Mark run as unofficial instead of failing
+        self.isOfficialRun = false
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[Turtle Dungeon Timer]|r " .. TDT_L("PREP_UNOFFICIAL_WARNING"), 1, 0.6, 0)
+        -- Continue with other checks
     end
     
-    -- Success - no output needed
+    -- Continue regardless (unofficial run is still allowed)
     return true
 end
 
@@ -688,7 +690,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    ResetInstances()
+    -- ResetInstances()
     
     -- Wait a moment for system message (or just simulate success)
     self:scheduleTimer(function()
@@ -805,11 +807,12 @@ function TurtleDungeonTimer:showGroupVotePrompt(voteType, title, dungeonName, in
     -- ============================================================================
     
     -- Collect all group members with initiator always first (if provided)
+    -- IMPORTANT: Only show members who have the addon (they're the only ones who can vote!)
     local groupMembers = {}
     local playerName = UnitName("player")
     local isLeader = self:isGroupLeader()
     
-    -- Add initiator first if provided
+    -- Add initiator first if provided (they must have addon)
     if initiatorName then
         table.insert(groupMembers, initiatorName)
     elseif isLeader and playerName then
@@ -817,24 +820,15 @@ function TurtleDungeonTimer:showGroupVotePrompt(voteType, title, dungeonName, in
         table.insert(groupMembers, playerName)
     end
     
-    -- Add all other group members
-    if GetNumRaidMembers() > 0 then
-        for i = 1, GetNumRaidMembers() do
-            local name = UnitName("raid" .. i)
-            if name and name ~= (initiatorName or playerName) then
-                table.insert(groupMembers, name)
-            end
-        end
-    elseif GetNumPartyMembers() > 0 then
-        for i = 1, GetNumPartyMembers() do
-            local name = UnitName("party" .. i)
-            if name and name ~= (initiatorName or playerName) then
-                table.insert(groupMembers, name)
-            end
+    -- Add all OTHER group members who have the addon
+    for addonUser, _ in pairs(self.playersWithAddon) do
+        -- Skip if already added as initiator/leader
+        if addonUser ~= initiatorName and addonUser ~= playerName then
+            table.insert(groupMembers, addonUser)
         end
     end
     
-    -- If player is not in list yet, add them
+    -- If player is not in list yet, add them (player always has addon by definition)
     local playerInList = false
     for _, name in ipairs(groupMembers) do
         if name == playerName then

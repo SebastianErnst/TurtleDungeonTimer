@@ -24,6 +24,9 @@ function TurtleDungeonTimer:registerEvents()
                 -- Set grace period to prevent false group-change aborts
                 timer.loginGracePeriodEnd = GetTime() + timer.LOGIN_GRACE_PERIOD
                 
+                -- Check for zone change (for countdown trigger)
+                timer:onZoneChanged()
+                
                 -- Request current run data after delay
                 timer:scheduleTimer(function()
                     TurtleDungeonTimer:getInstance():requestCurrentRunData()

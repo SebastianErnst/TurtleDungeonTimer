@@ -75,6 +75,9 @@ function TurtleDungeonTimer:new()
     self.runWorldBuffPlayers = {}     -- World Buffs at run start (for tooltip during run)
     self.runWithWorldBuffs = nil      -- Run marked with World Buffs (permanent during run)
     
+    -- Official run tracking
+    self.isOfficialRun = true         -- False if not all group members have addon
+    
     -- Initialize database
     self:initializeDatabase()
     
@@ -373,7 +376,8 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
         hasWorldBuffs = self.hasWorldBuffs or false,
         worldBuffPlayers = self.worldBuffPlayers or {},
         trashProgress = trashProgress,
-        trashRequired = trashRequired
+        trashRequired = trashRequired,
+        isOfficial = self.isOfficialRun == true  -- Track if all group members had addon
     }
     
     -- Add to beginning of history
