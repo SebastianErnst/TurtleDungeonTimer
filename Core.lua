@@ -14,7 +14,7 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- z = Build number (0-9999, increment on every change)
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc AND README.md!
 -- When updating version: Change this constant, the .toc file, AND the README.md file.
-TurtleDungeonTimer.ADDON_VERSION = "0.15.5"
+TurtleDungeonTimer.ADDON_VERSION = "0.15.8"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil

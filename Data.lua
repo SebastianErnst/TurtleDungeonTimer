@@ -20,7 +20,8 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                     { name = "Wicked Skitterer",             hp = 13851, count = 13 }  -- 180063
                 },
                 totalTrashHP = 1521201,                                                -- Total: 118035 + 235182 + 210239 + 160485 + 184470 + 39796 + 192576 + 200355 + 180063
-                trashRequiredPercent = 65                                              -- 80% required for completion
+                trashRequiredPercent = 65,
+                trashRequiredPercentTested = true                    
             }
         }
     },
@@ -34,6 +35,7 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                     ["Hearthsinger Forresten"] = true -- Rare
                 },
                 trashRequiredPercent = 65,
+                trashRequiredPercentTested = true,
                 totalTrashHP = 1924677, -- Total: (3242*42)+(1003*16)+(9151*22)+(3401*24)+(10031*14)+(18374*2)+(9187*14)+(6483*3)+(3293*25)+(3344*9)+(9724*8)+(6687*8)+(6299*9)+(9474*6)+(6101*3)+(18949*1)+(9448*8)+(15046*1)+(7818*13)+(6633*4)+(7349*7)+(9187*11)+(6432*5)+(9474*6)+(7580*2)+(6841*5)+(7580*8)+(7049*5)+(7818*1)+(6841*2)+(8059*6)+(6633*1)+(7818*2)+(6841*2)+(10072*5)+(8059*1)
                 trashMobs = {
                     { name = "Skeletal Berserker",  hp = 3242,  count = 42 },
@@ -79,7 +81,8 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                 optionalBosses = {
                     ["Stonespine"] = true -- Rare
                 },
-                trashRequiredPercent = 70,
+                trashRequiredPercent = 85,
+                trashRequiredPercentTested = true,
                 totalTrashHP = 1392146,
                 trashMobs = {
                     { name = "Mangled Cadaver",      hp = 9151,  count = 3 },
@@ -452,7 +455,7 @@ TurtleDungeonTimer.DUNGEON_DATA = {
         isDungeon = true,
         variants = {
             ["Default"] = {
-                bosses = { "Kirtonos the Herald", "Jandice Barov", "Rattlegore", "Ras Frostwhisper", "Instructor Malicia", "Doctor Theolen Krastinov", "Lorekeeper Polkelt", "The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov", "Darkmaster Gandling" },
+                bosses = { "Jandice Barov", "Rattlegore", "Ras Frostwhisper", "Instructor Malicia", "Doctor Theolen Krastinov", "Lorekeeper Polkelt", "The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov", "Darkmaster Gandling" },
                 optionalBosses = {
                     ["Marduk Blackpool"] = true, -- Rare
                     ["Vectus"] = true            -- Rare
@@ -504,7 +507,8 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                     { name = "Risen Warrior",             hp = 17292, count = 2 }
                 },
                 totalTrashHP = 1852571,   -- Total: (9187*8)+(9479*1)+(7349*15)+(6432*11)+(7580*5)+(6633*6)+(8059*1)+(7819*2)+(7580*1)+(9771*3)+(7818*4)+(7580*2)+(9773*2)+(1167*4)+(7349*8)+(7580*2)+(8059*2)+(8059*2)+(7818*8)+(7580*11)+(7818*6)+(7580*6)+(7580*3)+(7819*2)+(7819*2)+(4265*13)+(8059*5)+(4397*9)+(16291*1)+(16791*4)+(15791*3)+(2297*17)+(9474*13)+(1628*32)+(2368*32)+(9771*16)+(1579*13)+(10072*2)+(7820*1)+(8300*1)+(4263*23)+(9771*5)+(7580*4)+(17292*2)
-                trashRequiredPercent = 50 -- 50% required
+                trashRequiredPercent = 70, -- 50% required,
+                trashRequiredPercentTested = true
             }
         }
     },

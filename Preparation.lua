@@ -47,6 +47,26 @@ function TurtleDungeonTimer:hasAnyVariantWithTrash(dungeonKey)
     return false
 end
 
+function TurtleDungeonTimer:allVariantsTested(dungeonKey)
+    local dungeonData = self.DUNGEON_DATA[dungeonKey]
+    if not dungeonData or not dungeonData.variants then
+        return false
+    end
+    
+    -- Check if all variants with trash data have trashRequiredPercentTested = true
+    local hasVariantWithTrash = false
+    for variantName, variantData in pairs(dungeonData.variants) do
+        if self:hasTrashData(dungeonKey, variantName) then
+            hasVariantWithTrash = true
+            if not variantData.trashRequiredPercentTested then
+                return false  -- Found variant without tested flag
+            end
+        end
+    end
+    
+    return hasVariantWithTrash  -- All variants are tested (or no variants with trash)
+end
+
 function TurtleDungeonTimer:startPreparation()
     -- Check if player is group leader
     if not self:isGroupLeader() then
@@ -137,12 +157,14 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
         end
         -- Check if dungeon has any variant with trash data
         local hasTrash = self:hasAnyVariantWithTrash(dungeonName)
+        local allTested = self:allVariantsTested(dungeonName)
         
         table.insert(dungeonList, {
             key = dungeonName,
             displayName = displayName,
             variantCount = variantCount,
-            hasTrash = hasTrash
+            hasTrash = hasTrash,
+            allTested = allTested
         })
     end
     
@@ -179,14 +201,18 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
         
         -- Check if dungeon has trash data
         local hasTrash = dungeon.hasTrash
+        local allTested = dungeon.allTested
         local displayText = dungeon.displayName
         
         if not hasTrash then
             -- Strikethrough text for dungeons without trash data
             displayText = "|cff666666" .. dungeon.displayName .. "|r"
             btnText:SetTextColor(0.4, 0.4, 0.4)  -- Gray out
+        elseif not allTested then
+            -- Yellow color for dungeons not fully tested
+            btnText:SetTextColor(1, 1, 0)  -- Yellow
         else
-            btnText:SetTextColor(1, 1, 1)  -- Normal white
+            btnText:SetTextColor(1, 1, 1)  -- Normal white (fully tested)
         end
         
         btnText:SetText(displayText)
@@ -198,6 +224,10 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
             arrow:SetText(">")
             if not hasTrash then
                 arrow:SetTextColor(0.4, 0.4, 0.4)  -- Gray out arrow too
+            elseif not allTested then
+                arrow:SetTextColor(1, 1, 0)  -- Yellow arrow for untested
+            else
+                arrow:SetTextColor(1, 1, 1)  -- White arrow for tested
             end
         end
         
@@ -205,6 +235,7 @@ function TurtleDungeonTimer:showPreparationDungeonSelector()
         local dungeonKey = dungeon.key
         local variantCount = dungeon.variantCount
         local dungeonHasTrash = hasTrash
+        local dungeonAllTested = allTested
         
         btn:SetScript("OnEnter", function()
             if not dungeonHasTrash then
@@ -306,6 +337,8 @@ function TurtleDungeonTimer:showPreparationVariantMenu(parentBtn, dungeonKey)
         
         -- Check if this variant has trash data
         local hasTrash = self:hasTrashData(dungeonKey, variantName)
+        local variantData = dungeonData.variants[variantName]
+        local isTested = variantData and variantData.trashRequiredPercentTested or false
         
         local btn = CreateFrame("Button", nil, submenu)
         btn:SetWidth(140)
@@ -320,7 +353,12 @@ function TurtleDungeonTimer:showPreparationVariantMenu(parentBtn, dungeonKey)
             -- Strikethrough and gray out variants without trash
             text:SetText("|cff666666" .. variantName .. "|r")
             text:SetTextColor(0.4, 0.4, 0.4)
+        elseif not isTested then
+            -- Yellow for variants with trash but not tested
+            text:SetText(variantName)
+            text:SetTextColor(1, 1, 0)  -- Yellow
         else
+            -- White for tested variants
             text:SetText(variantName)
             text:SetTextColor(1, 1, 1)
         end
@@ -690,7 +728,7 @@ function TurtleDungeonTimer:executeReset()
     end
     
     -- ⚠️ TESTING MODE - Skip actual reset
-    -- ResetInstances()
+    ResetInstances()
     
     -- Wait a moment for system message (or just simulate success)
     self:scheduleTimer(function()
