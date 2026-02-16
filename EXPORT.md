@@ -18,19 +18,19 @@ Handles run data serialization, Base64 encoding, and export string generation fo
 
 ### Export String Structure
 ```
-TDT|uuid|dungeon|variant|totalTime|deaths|playerName|guildName|classes|worldBuffFlag|boss1:time|boss2:time|...
+TDT|uuid|dungeon|variant|totalTime|deaths|playerName|guildName|classes|worldBuffFlag|trashProgress|trashRequired|timestamp|completed|isOfficial|boss1:time|boss2:time|...|CHK:checksum
 ```
 
 **Field Separator:** `|` (pipe)
 
 **Example (before Base64):**
 ```
-TDT|550e8400-e29b-41d4-a716-446655440000|Stratholme|Live|2723|2|Playerone|MyGuild|Warrior,Priest,Mage|1|Magistrate_Barthilas:332|Ramstein:2325|Baron_Rivendare:2723
+TDT|550e8400-e29b-41d4-a716-446655440000|Stratholme|Live|2723|2|Playerone|MyGuild|Warrior,Priest,Mage|1|67.50|65|1739481600|1|1|Magistrate_Barthilas:332|Ramstein:2325|Baron_Rivendare:2723|CHK:A3F2E1
 ```
 
 **After Base64 Encoding:**
 ```
-VERUfDU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMHxTdHJhdGhvbG1lfExpdmV8MjcyM3wyfFBsYXllcm9uZXxNeUd1aWxkfFdhcnJpb3IsUHJpZXN0LE1hZ2V8MXxNYWdpc3RyYXRlX0JhcnRoaWxhczozMzJ8UmFtc3RlaW46MjMyNXxCYXJvbl9SaXZlbmRhcmU6MjcyMw==
+VERUfDU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMHxTdHJhdGhvbG1lfExpdmV8MjcyM3wyfFBsYXllcm9uZXxNeUd1aWxkfFdhcnJpb3IsUHJpZXN0LE1hZ2V8MXw2Ny41MHw2NXwxNzM5NDgxNjAwfDF8MXxNYWdpc3RyYXRlX0JhcnRoaWxhczozMzJ8UmFtc3RlaW46MjMyNXxCYXJvbl9SaXZlbmRhcmU6MjcyM3xDSEs6QTNGMKUX...
 ```
 
 ---
@@ -49,7 +49,49 @@ VERUfDU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMHxTdHJhdGhvbG1lfExpdmV8Mjcy
 | 8 | Guild Name | string | Guild name | Spaces → `_`, colons → `_`, "No_Guild" if none |
 | 9 | Classes | string | Group composition | Comma-separated, "Solo" if alone |
 | 10 | World Buffs | string | Buff flag | "1" = yes, "0" = no |
-| 11+ | Boss Kills | string | Boss:time pairs | `BossName:timeInSeconds` |
+| 11 | Trash Progress | number | Actual trash % killed | Decimal (e.g. "67.50" or "102.30") |
+| 12 | Trash Required | number | Required trash % | Integer (e.g. "65" or "85") |
+| 13 | Timestamp | number | Run completion time | Unix timestamp (seconds since epoch) |
+| 14 | Completed | string | Run finished flag | "1" = completed, "0" = incomplete |
+| 15 | Official | string | All had addon flag | "1" = official, "0" = unofficial |
+| 16+ | Boss Kills | string | Boss:time pairs | `BossName:timeInSeconds` |
+| Last | Checksum | string | Data integrity check | `CHK:HEXVALUE` (CRC-like hash) |
+
+---
+
+## Data Security
+
+### Checksum System
+To prevent data manipulation, a checksum is calculated over all fields before Base64 encoding:
+
+```lua
+function TurtleDungeonTimer:calculateChecksum(data)
+    local sum = 0
+    for i = 1, string.len(data) do
+        local byte = string.byte(data, i)
+        sum = mod(sum + byte * (i * 37), 16777216)
+    end
+    return string.format("%X", sum)
+end
+```
+
+**How it works:**
+1. All export data fields are concatenated with `|` separator
+2. Checksum is calculated over the entire string
+3. Checksum is appended as `CHK:HEXVALUE`
+4. Complete string (including checksum) is Base64 encoded
+
+**Import validation:**
+1. Decode Base64 string
+2. Split by `|` and extract checksum
+3. Recalculate checksum over data fields
+4. Compare calculated vs. provided checksum
+5. Reject if they don't match
+
+This prevents:
+- Manual manipulation of export strings
+- Accidental data corruption
+- Fake run submissions
 
 ---
 

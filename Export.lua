@@ -8,6 +8,16 @@ local function mod(a, b)
     return a - math.floor(a / b) * b
 end
 
+-- Simple checksum function for data integrity (CRC-like)
+function TurtleDungeonTimer:calculateChecksum(data)
+    local sum = 0
+    for i = 1, string.len(data) do
+        local byte = string.byte(data, i)
+        sum = mod(sum + byte * (i * 37), 16777216)  -- Use prime multiplier and keep under 24-bit
+    end
+    return string.format("%X", sum)  -- Return as hex string
+end
+
 -- Generate a UUID v4
 function TurtleDungeonTimer:generateUUID()
     local template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
@@ -56,6 +66,7 @@ end
 -- Unified export function that works with both current run and history entries
 function TurtleDungeonTimer:exportRunData(entry)
     local killTimes, deathCount, dungeon, variant, playerName, guildName, groupClasses, uuid, hasWorldBuffs
+    local trashProgress, trashRequired, timestamp, completed, isOfficial
     
     if entry then
         -- Export from history entry
@@ -68,6 +79,11 @@ function TurtleDungeonTimer:exportRunData(entry)
         groupClasses = entry.groupClasses
         uuid = entry.uuid
         hasWorldBuffs = entry.hasWorldBuffs or false
+        trashProgress = entry.trashProgress or 0
+        trashRequired = entry.trashRequired or 100
+        timestamp = entry.timestamp or 0
+        completed = entry.completed or false
+        isOfficial = entry.isOfficial or false
     else
         -- Export from current run
         killTimes = self.killTimes or {}
@@ -79,6 +95,22 @@ function TurtleDungeonTimer:exportRunData(entry)
         groupClasses = self.groupClasses
         uuid = self.currentRunUUID
         hasWorldBuffs = self.hasWorldBuffs or false
+        
+        -- Get trash progress for current run
+        trashProgress = 0
+        trashRequired = 100
+        local dungeonData = self.DUNGEON_DATA[dungeon]
+        if dungeonData and variant then
+            local variantData = dungeonData.variants[variant]
+            if variantData and variantData.trashMobs and TDTTrashCounter then
+                trashProgress = TDTTrashCounter:getProgress() or 0
+                trashRequired = variantData.trashRequiredPercent or 100
+            end
+        end
+        
+        timestamp = time()
+        completed = false  -- Current run is not completed yet
+        isOfficial = self.isOfficialRun or false
     end
     
     if table.getn(killTimes) == 0 then
@@ -131,6 +163,21 @@ function TurtleDungeonTimer:exportRunData(entry)
     -- World Buffs indicator (0 = no, 1 = yes)
     table.insert(parts, hasWorldBuffs and "1" or "0")
     
+    -- Trash Progress (e.g. 67.5 or 102.3)
+    table.insert(parts, string.format("%.2f", trashProgress))
+    
+    -- Trash Required (e.g. 65 or 85)
+    table.insert(parts, string.format("%.0f", trashRequired))
+    
+    -- Timestamp (Unix timestamp)
+    table.insert(parts, tostring(timestamp))
+    
+    -- Completed flag (0 = no, 1 = yes)
+    table.insert(parts, completed and "1" or "0")
+    
+    -- Official run flag (0 = no, 1 = yes) - all group members had addon
+    table.insert(parts, isOfficial and "1" or "0")
+    
     -- Boss times
     for i = 1, table.getn(killTimes) do
         local bossName = string.gsub(killTimes[i].bossName, "[%s:]", "_")
@@ -140,8 +187,12 @@ function TurtleDungeonTimer:exportRunData(entry)
     
     local rawString = table.concat(parts, "|")
     
+    -- Calculate checksum for data integrity
+    local checksum = self:calculateChecksum(rawString)
+    local rawStringWithChecksum = rawString .. "|CHK:" .. checksum
+    
     -- Encode with Base64
-    return self:encodeBase64(rawString)
+    return self:encodeBase64(rawStringWithChecksum)
 end
 
 function TurtleDungeonTimer:showExportDialog()
@@ -152,18 +203,14 @@ function TurtleDungeonTimer:showExportDialog()
         return
     end
     
-    -- Print to chat for easy copying
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Export String:")
-    DEFAULT_CHAT_FRAME:AddMessage(exportString)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Tip:|r Click and drag to select the string above, then right-click to copy.")
-    
     -- Create or show existing dialog
     if self.exportDialog then
+        self.exportDialog:Show()
         if self.exportDialog.editBox then
             self.exportDialog.editBox:SetText(exportString)
-            self.exportDialog.editBox:HighlightText()
+            self.exportDialog.editBox:SetFocus()
+            self.exportDialog.editBox:HighlightText(0)
         end
-        self.exportDialog:Show()
         return
     end
     
@@ -221,9 +268,11 @@ function TurtleDungeonTimer:showExportDialog()
     editBox:SetTextColor(1, 1, 1)
     editBox:SetAutoFocus(false)
     editBox:SetText(exportString)
+    editBox:SetFocus()
     editBox:HighlightText()
     editBox:SetScript("OnEscapePressed", function()
         dialog:Hide()
+        this:ClearFocus()
     end)
     editBox:SetScript("OnEditFocusGained", function()
         this:HighlightText()

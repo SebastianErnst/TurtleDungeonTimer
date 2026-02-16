@@ -447,7 +447,8 @@ TurtleDungeonTimer.DUNGEON_DATA = {
                     { name = "Rage Talon Fire Tongue",    hp = 20143, count = 2 }
                 },
                 totalTrashHP = 2757160,      -- Total calculated by Python script
-                trashRequiredPercent = 75    -- 50% required
+                trashRequiredPercent = 75,    -- 50% required
+                trashRequiredPercentTested = true
             }
         }
     },

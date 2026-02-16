@@ -1328,43 +1328,14 @@ function TurtleDungeonTimer:showHistoryExportDialog(entry)
         return
     end
     
-    -- Calculate progress percentage for this entry
-    local progressText = "N/A"
-    if entry.trashProgress then
-        local progress = entry.trashProgress
-        if progress > 100 then
-            local overage = progress - 100
-            progressText = string.format("100%% (+%.2f%%)", overage)
-        else
-            progressText = string.format("%.2f%%", progress)
-        end
-    end
-    
-    -- Print to chat with dungeon, time, and percentage
-    local totalTime = 0
-    if entry.killTimes and table.getn(entry.killTimes) > 0 then
-        totalTime = entry.killTimes[table.getn(entry.killTimes)].time
-    end
-    local minutes = math.floor(totalTime / 60)
-    local seconds = totalTime - (minutes * 60)
-    local timeStr = string.format("%02d:%02d", minutes, seconds)
-    
-    local dungeonName = entry.dungeon or "Unknown"
-    local variantName = entry.variant or "Default"
-    
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Turtle Dungeon Timer]|r Export String:", 0, 1, 0)
-    DEFAULT_CHAT_FRAME:AddMessage("|cffffffffDungeon:|r " .. dungeonName .. " (" .. variantName .. ")", 1, 1, 1)
-    DEFAULT_CHAT_FRAME:AddMessage("|cffffffffTime:|r " .. timeStr .. " |cffffffffTrash:|r " .. progressText, 1, 1, 1)
-    DEFAULT_CHAT_FRAME:AddMessage(exportString)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00Tip:|r Click and drag to select the string above, then right-click to copy.")
-    
     -- Create or show existing dialog
     if self.historyExportDialog then
+        self.historyExportDialog:Show()
         if self.historyExportDialog.editBox then
             self.historyExportDialog.editBox:SetText(exportString)
-            self.historyExportDialog.editBox:HighlightText()
+            self.historyExportDialog.editBox:SetFocus()
+            self.historyExportDialog.editBox:HighlightText(0)
         end
-        self.historyExportDialog:Show()
         return
     end
     
@@ -1421,9 +1392,11 @@ function TurtleDungeonTimer:showHistoryExportDialog(entry)
     editBox:SetTextColor(1, 1, 1)
     editBox:SetAutoFocus(false)
     editBox:SetText(exportString)
+    editBox:SetFocus()
     editBox:HighlightText()
     editBox:SetScript("OnEscapePressed", function()
         dialog:Hide()
+        this:ClearFocus()
     end)
     editBox:SetScript("OnEditFocusGained", function()
         this:HighlightText()
