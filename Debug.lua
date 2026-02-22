@@ -128,6 +128,12 @@ function TurtleDungeonTimer:createDebugFrame()
             DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Run history cleared!", 0, 1, 0)
         end
     end)
+
+    createButton("Reset Dungeon Selection", function()
+        local timer = TurtleDungeonTimer:getInstance()
+        timer:clearDungeonSelection()
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[TDT]|r Dungeon selection reset (Select Dungeon).", 0, 1, 0)
+    end)
     
     createButton("Reset All Saved Data", function()
         TurtleDungeonTimerDB = {

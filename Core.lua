@@ -14,10 +14,11 @@ TurtleDungeonTimer.__index = TurtleDungeonTimer
 -- z = Build number (0-9999, increment on every change)
 -- NOTE: This version MUST match the version in TurtleDungeonTimer.toc AND README.md!
 -- When updating version: Change this constant, the .toc file, AND the README.md file.
-TurtleDungeonTimer.ADDON_VERSION = "0.15.9"
+TurtleDungeonTimer.ADDON_VERSION = "0.15.20"
 TurtleDungeonTimer.SYNC_VERSION = "1.0"  -- Protocol version for sync compatibility
 
 local _instance = nil
+local HISTORY_LIMIT = 500
 
 -- ============================================================================
 -- SINGLETON
@@ -383,8 +384,8 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
     -- Add to beginning of history
     table.insert(TurtleDungeonTimerDB.history, 1, historyEntry)
     
-    -- Keep only last 10 entries
-    while table.getn(TurtleDungeonTimerDB.history) > 10 do
+    -- Keep only last HISTORY_LIMIT entries
+    while table.getn(TurtleDungeonTimerDB.history) > HISTORY_LIMIT do
         table.remove(TurtleDungeonTimerDB.history)
     end
 end

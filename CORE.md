@@ -244,7 +244,7 @@ function TurtleDungeonTimer:saveBestTime(totalTime)
 
 ### saveToHistory(finalTime, completed)
 
-Speichert Run in History (letzte 10 Runs).
+Speichert Run in History (letzte 500 Runs).
 
 ```lua
 function TurtleDungeonTimer:saveToHistory(finalTime, completed)
@@ -257,7 +257,7 @@ function TurtleDungeonTimer:saveToHistory(finalTime, completed)
 **Logik**:
 1. Erstellt History-Entry mit UUID
 2. Fügt am Anfang ein (`table.insert(history, 1, entry)`)
-3. Limitiert auf 10 Einträge
+3. Limitiert auf 500 Einträge
 4. Speichert World Buff Status
 
 ---
@@ -430,14 +430,14 @@ end
 
 - **Singleton**: O(1) Zugriff auf Instanz
 - **getBestTime()**: O(1) Table-Lookup
-- **saveToHistory()**: O(n) Array-Insert, limitiert auf 10
+- **saveToHistory()**: O(n) Array-Insert, limitiert auf 500
 - **restoreLastRun()**: O(n) Boss-Row Updates
 
 ---
 
 ## Future Enhancements
 
-- [ ] Multiple History-Limits (10/50/100)
+- [ ] Multiple History-Limits (50/100/500)
 - [ ] Best Time per Player/Guild
 - [ ] Mehr Settings (Timer-Format, Auto-Start, etc.)
 - [ ] History Export to CSV/JSON

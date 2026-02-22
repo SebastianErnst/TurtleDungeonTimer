@@ -1191,6 +1191,32 @@ Before committing code, check:
 - [ ] No redundant frame/string operations
 - [ ] Addon messages batched when possible
 
+### Magic Numbers & Central Constants (Best Practice)
+
+**⚠️ COMMON MAINTENANCE ISSUE:** Hardcoded limits spread across code are easy to miss and cause inconsistent behavior.
+
+```lua
+-- ❌ WRONG - Hardcoded limit in logic
+while table.getn(MyAddonDB.history) > 500 do
+    table.remove(MyAddonDB.history)
+end
+
+-- ✅ CORRECT - Central constant at file top (or config section)
+local HISTORY_LIMIT = 500
+
+while table.getn(MyAddonDB.history) > HISTORY_LIMIT do
+    table.remove(MyAddonDB.history)
+end
+```
+
+**Why this helps:**
+1. **Single source of truth** for important limits
+2. **Safer refactoring** (change once, applies everywhere)
+3. **Clear intent** when reading code (`HISTORY_LIMIT` explains meaning)
+4. **Fewer bugs** from mismatched values in different files/functions
+
+**Rule:** Any gameplay/UI/storage limit used in logic should be a named constant, not an inline number.
+
 ---
 
 ### Delayed/Scheduled Execution

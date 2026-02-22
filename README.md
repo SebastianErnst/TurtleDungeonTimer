@@ -1,6 +1,6 @@
 # Turtle Dungeon Timer
 
-**Version:** 0.15.9  
+**Version:** 0.15.20  
 **Author:** Zasamel  
 **Interface:** 11200 (WoW 1.12 - Vanilla)
 
@@ -13,7 +13,7 @@ A dungeon timer for Turtle WoW with boss tracking, best times, and group synchro
 - ⏱️ **Precise Timing**: Second-accurate measurement for dungeon runs
 - 📊 **Boss & Trash Tracking**: Automatic detection of all kills via combat log
 - 💀 **Death Counter**: Tracks group deaths with automatic detection
-- 📜 **Run History**: Saves the last 10 runs with complete details
+- 📜 **Run History**: Saves the last 500 runs with complete details
 - 🔄 **Group Sync**: Synchronizes timer, boss kills, and resets across the group
 - 🎯 **World Buff System**: Detects 21 world buffs and optionally removes them during runs
 - 📤 **Export System**: Base64-encoded export strings for external tracking tools
@@ -92,7 +92,7 @@ The easiest way - updates are applied automatically:
 
 - Boss detection based on exact combat log names
 - Sync system requires same addon version across group
-- Only the last 10 runs are saved
+- Only the last 500 runs are saved
 - Export function only (no import possible)
 
 ---

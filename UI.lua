@@ -132,6 +132,9 @@ function TurtleDungeonTimer:selectDungeon(dungeonName)
     self.selectedVariant = nil
     self.bossList = {}
 
+    -- Enable boss list toggle as soon as a dungeon is selected
+    self:updateBossListToggleState()
+
     if TurtleDungeonTimerDB.debug then
         DEFAULT_CHAT_FRAME:AddMessage("[Debug] selectDungeon: Set selectedDungeon to: " .. tostring(dungeonName), 0, 1, 0)
     end
@@ -221,6 +224,36 @@ function TurtleDungeonTimer:selectVariant(variantName)
 
     -- Rebuild boss list
     self:rebuildBossRows()
+end
+
+function TurtleDungeonTimer:clearDungeonSelection()
+    self.selectedDungeon = nil
+    self.selectedVariant = nil
+    self.bossList = {}
+    self.bossLookup = {}
+    self.optionalBosses = {}
+    self.bossListExpanded = false
+
+    if TurtleDungeonTimerDB and TurtleDungeonTimerDB.lastSelection then
+        TurtleDungeonTimerDB.lastSelection.dungeon = nil
+        TurtleDungeonTimerDB.lastSelection.variant = nil
+    end
+
+    if self.frame and self.frame.dungeonNameText then
+        self.frame.dungeonNameText:SetText(TDT_L("UI_LEADER_SELECT_DUNGEON"))
+        self.frame.dungeonNameText:SetTextColor(1, 1, 1)
+    end
+
+    if TDTTrashCounter and TDTTrashCounter.stopDungeon then
+        TDTTrashCounter:stopDungeon()
+    end
+
+    self.lastDisplayedProgress = nil
+    self:updateProgressBar()
+
+    -- Rebuild and collapse boss list UI
+    self:rebuildBossRows()
+    self:updateBossListToggleState()
 end
 
 -- ============================================================================
@@ -518,6 +551,7 @@ function TurtleDungeonTimer:createProgressBar()
         TurtleDungeonTimer:getInstance():toggleBossList()
     end)
     self.frame.toggleButton = toggleBtn
+    self:updateBossListToggleState()
     
     -- Performance: OnUpdate removed - timer updates are handled in Timer.lua:setupUpdateLoop()
     -- with proper throttling (0.1s instead of every frame = 60x less CPU usage)
@@ -528,12 +562,46 @@ end
 -- ============================================================================
 function TurtleDungeonTimer:createBossList()
     -- Container for boss list
-    local bossContainer = CreateFrame("Frame", nil, self.frame)
+    local bossContainer = CreateFrame("ScrollFrame", "TurtleDungeonTimerBossListScrollFrame", self.frame, "UIPanelScrollFrameTemplate")
     bossContainer:SetPoint("TOPLEFT", self.frame.progressBg, "BOTTOMLEFT", 0, -6)
     bossContainer:SetWidth(218)
     bossContainer:SetHeight(1) -- Will expand
     bossContainer:Hide()       -- Hidden by default
+    bossContainer:EnableMouseWheel()
     self.frame.bossContainer = bossContainer
+
+    local scrollChild = CreateFrame("Frame", nil, bossContainer)
+    scrollChild:SetWidth(200)
+    scrollChild:SetHeight(1)
+    bossContainer:SetScrollChild(scrollChild)
+    self.frame.bossScrollChild = scrollChild
+
+    local scrollBar = _G["TurtleDungeonTimerBossListScrollFrameScrollBar"]
+    if scrollBar then
+        scrollBar:SetValueStep(23)
+        scrollBar:ClearAllPoints()
+        scrollBar:SetPoint("TOPLEFT", bossContainer, "TOPRIGHT", -18, -16)
+        scrollBar:SetPoint("BOTTOMLEFT", bossContainer, "BOTTOMRIGHT", -18, 16)
+        self.frame.bossScrollBar = scrollBar
+    end
+
+    bossContainer:SetScript("OnMouseWheel", function()
+        local current = bossContainer:GetVerticalScroll()
+        local maxScroll = bossContainer:GetVerticalScrollRange()
+        local step = 23
+        local newValue
+
+        if arg1 > 0 then
+            newValue = math.max(0, current - step)
+        else
+            newValue = math.min(maxScroll, current + step)
+        end
+
+        bossContainer:SetVerticalScroll(newValue)
+        if self.frame.bossScrollBar and self.frame.bossScrollBar.SetValue then
+            self.frame.bossScrollBar:SetValue(newValue)
+        end
+    end)
 
     -- Will be populated when dungeon is selected
     self.frame.bossRows = {}
@@ -543,12 +611,51 @@ end
 -- BOSS LIST MANAGEMENT
 -- ============================================================================
 function TurtleDungeonTimer:toggleBossList()
+    if not self.selectedDungeon then return end
+
     self.bossListExpanded = not self.bossListExpanded
 
     if self.bossListExpanded then
         self:expandBossList()
     else
         self:collapseBossList()
+    end
+end
+
+function TurtleDungeonTimer:updateBossListToggleState()
+    if not self.frame or not self.frame.toggleButton or not self.frame.toggleButton.arrow then
+        return
+    end
+
+    local hasDungeon = self.selectedDungeon and self.selectedDungeon ~= ""
+
+    if hasDungeon then
+        self.frame.toggleButton:Enable()
+        self.frame.toggleButton:SetAlpha(1)
+        self.frame.toggleButton.arrow:SetVertexColor(1, 1, 1)
+
+        if self.bossListExpanded then
+            self.frame.toggleButton.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up")
+        else
+            self.frame.toggleButton.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+        end
+    else
+        self.bossListExpanded = false
+
+        -- Ensure collapsed state when disabled
+        if self.frame.bossContainer then
+            self.frame.bossContainer:Hide()
+        end
+        if self.frame.progressBg then
+            self.frame.toggleButton:ClearAllPoints()
+            self.frame.toggleButton:SetPoint("TOPRIGHT", self.frame.progressBg, "BOTTOMRIGHT", 5, -11)
+        end
+        self.frame:SetHeight(115)
+
+        self.frame.toggleButton:Disable()
+        self.frame.toggleButton:SetAlpha(0.5)
+        self.frame.toggleButton.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+        self.frame.toggleButton.arrow:SetVertexColor(0.5, 0.5, 0.5)
     end
 end
 
@@ -569,6 +676,9 @@ function TurtleDungeonTimer:expandBossList()
     -- Expand frame
     self.frame:SetHeight(115 + visibleHeight + 10)
     self.frame.bossContainer:SetHeight(visibleHeight)
+    if self.frame.bossScrollChild then
+        self.frame.bossScrollChild:SetHeight(totalContentHeight)
+    end
 
     self.frame.bossContainer:Show()
 
@@ -587,6 +697,11 @@ function TurtleDungeonTimer:collapseBossList()
     -- Collapse frame
     self.frame:SetHeight(115)
     self.frame.bossContainer:Hide()
+    self.frame.bossContainer:SetVerticalScroll(0)
+    if self.frame.bossScrollBar then
+        self.frame.bossScrollBar:SetValue(0)
+        self.frame.bossScrollBar:Hide()
+    end
 
     -- Update arrow direction (down) and position
     self.frame.toggleButton.arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
@@ -595,7 +710,7 @@ function TurtleDungeonTimer:collapseBossList()
 end
 
 function TurtleDungeonTimer:updateBossRows()
-    if not self.frame or not self.frame.bossContainer then return end
+    if not self.frame or not self.frame.bossContainer or not self.frame.bossScrollChild then return end
     
     -- Don't update if list is collapsed
     if not self.bossListExpanded then return end
@@ -618,16 +733,16 @@ function TurtleDungeonTimer:updateBossRows()
     
     -- Initialize bossRows if needed (only create once!)
     if needsRecreate then
-        -- Clean up ALL children of bossContainer to remove old boss text
-        if self.frame.bossContainer then
-            local children = {self.frame.bossContainer:GetChildren()}
+        -- Clean up ALL children of scroll child to remove old boss text
+        if self.frame.bossScrollChild then
+            local children = {self.frame.bossScrollChild:GetChildren()}
             for _, child in ipairs(children) do
                 child:Hide()
                 child:SetParent(nil)
             end
             
             -- Also clean up font strings
-            local regions = {self.frame.bossContainer:GetRegions()}
+            local regions = {self.frame.bossScrollChild:GetRegions()}
             for _, region in ipairs(regions) do
                 if region.Hide then
                     region:Hide()
@@ -642,22 +757,28 @@ function TurtleDungeonTimer:updateBossRows()
             end
         end
         
-        -- Create new rows directly in bossContainer
+        -- Create new rows directly in scroll child
         self.frame.bossRows = {}
+
+        local rightOffset = -5
+        if self.frame.bossScrollBar and self.frame.bossScrollBar:IsShown() then
+            rightOffset = -20
+        end
+
         for i = 1, bossCount do
             local boss = self.bossList[i]
             local bossName = type(boss) == "table" and boss.name or boss
             
             -- Boss name (left) - 3px more right (-2 -> 1)
-            local nameText = self.frame.bossContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            nameText:SetPoint("TOPLEFT", self.frame.bossContainer, "TOPLEFT", 1, -(i-1) * rowHeight - 5)
+            local nameText = self.frame.bossScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameText:SetPoint("TOPLEFT", self.frame.bossScrollChild, "TOPLEFT", 1, -(i-1) * rowHeight - 5)
             nameText:SetText(bossName)
             nameText:SetJustifyH("LEFT")
             nameText:SetTextColor(1, 1, 1)
             
             -- Kill time (right) - 30px more right (-35 -> -5)
-            local timeText = self.frame.bossContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            timeText:SetPoint("TOPRIGHT", self.frame.bossContainer, "TOPRIGHT", -5, -(i-1) * rowHeight - 5)
+            local timeText = self.frame.bossScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            timeText:SetPoint("TOPRIGHT", self.frame.bossScrollChild, "TOPRIGHT", rightOffset, -(i-1) * rowHeight - 5)
             timeText:SetText("--:--")
             timeText:SetJustifyH("RIGHT")
             timeText:SetTextColor(0.5, 0.5, 0.5)
@@ -723,6 +844,23 @@ function TurtleDungeonTimer:updateBossRows()
             end
         end
     end
+
+    -- Update scroll range and scrollbar visibility
+    local maxScroll = self.frame.bossContainer:GetVerticalScrollRange()
+    if maxScroll < 0 then
+        maxScroll = 0
+    end
+
+    if self.frame.bossScrollBar then
+        self.frame.bossScrollBar:SetMinMaxValues(0, maxScroll)
+        self.frame.bossScrollBar:SetValue(0)
+        if maxScroll > 0 then
+            self.frame.bossScrollBar:Show()
+        else
+            self.frame.bossScrollBar:Hide()
+        end
+    end
+    self.frame.bossContainer:SetVerticalScroll(0)
 end
 
 function TurtleDungeonTimer:createBossRow(index, bossName, rowHeight)
@@ -937,7 +1075,7 @@ function TurtleDungeonTimer:showHistoryMenu(anchorFrame)
 end
 
 function TurtleDungeonTimer:createHistoryOverlay()
-    local overlay = CreateFrame("Frame", nil, UIParent)
+    local overlay = CreateFrame("Frame", "TurtleDungeonTimerHistoryOverlay", UIParent)
     overlay:SetWidth(400)
     overlay:SetHeight(500)
     overlay:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
@@ -976,10 +1114,10 @@ function TurtleDungeonTimer:createHistoryOverlay()
     closeText:SetTextColor(1, 0, 0)
     closeBtn:SetScript("OnClick", function() overlay:Hide() end)
 
-    -- Scroll frame for entries
-    local scrollFrame = CreateFrame("ScrollFrame", nil, overlay)
+    -- Scroll frame for entries (with built-in scrollbar template)
+    local scrollFrame = CreateFrame("ScrollFrame", "TurtleDungeonTimerHistoryScrollFrame", overlay, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", overlay, "TOPLEFT", 10, -45)
-    scrollFrame:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", -10, 10)
+    scrollFrame:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", -28, 10)
     overlay.scrollFrame = scrollFrame
 
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
@@ -988,16 +1126,28 @@ function TurtleDungeonTimer:createHistoryOverlay()
     scrollFrame:SetScrollChild(scrollChild)
     overlay.scrollChild = scrollChild
 
+    local scrollBar = _G["TurtleDungeonTimerHistoryScrollFrameScrollBar"]
+    if scrollBar then
+        scrollBar:SetValueStep(20)
+        overlay.scrollBar = scrollBar
+    end
+
     -- Enable scrolling
     scrollFrame:EnableMouseWheel()
     scrollFrame:SetScript("OnMouseWheel", function()
         local current = scrollFrame:GetVerticalScroll()
         local max = scrollFrame:GetVerticalScrollRange()
         local step = 20
+        local newValue
         if arg1 > 0 then
-            scrollFrame:SetVerticalScroll(math.max(0, current - step))
+            newValue = math.max(0, current - step)
         else
-            scrollFrame:SetVerticalScroll(math.min(max, current + step))
+            newValue = math.min(max, current + step)
+        end
+
+        scrollFrame:SetVerticalScroll(newValue)
+        if overlay.scrollBar and overlay.scrollBar.SetValue then
+            overlay.scrollBar:SetValue(newValue)
         end
     end)
 
@@ -1029,6 +1179,12 @@ function TurtleDungeonTimer:populateHistoryOverlay()
         noData:SetTextColor(0.5, 0.5, 0.5)
         table.insert(overlay.entries, noData)
         scrollChild:SetHeight(100)
+        if overlay.scrollBar then
+            overlay.scrollBar:SetMinMaxValues(0, 0)
+            overlay.scrollBar:SetValue(0)
+            overlay.scrollBar:Hide()
+        end
+        scrollFrame:SetVerticalScroll(0)
         return
     end
 
@@ -1091,6 +1247,24 @@ function TurtleDungeonTimer:populateHistoryOverlay()
 
         table.insert(overlay.entries, entryBtn)
     end
+
+    -- Update scrollbar range based on current content height
+    local maxScroll = scrollFrame:GetVerticalScrollRange()
+    if maxScroll < 0 then
+        maxScroll = 0
+    end
+
+    if overlay.scrollBar then
+        overlay.scrollBar:SetMinMaxValues(0, maxScroll)
+        overlay.scrollBar:SetValue(0)
+        if maxScroll > 0 then
+            overlay.scrollBar:Show()
+        else
+            overlay.scrollBar:Hide()
+        end
+    end
+
+    scrollFrame:SetVerticalScroll(0)
 end
 
 function TurtleDungeonTimer:showHistoryDetails(entry)

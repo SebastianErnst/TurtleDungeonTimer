@@ -181,7 +181,7 @@ timer.worldBuffPlayers
 ```lua
 TurtleDungeonTimerDB = {
     bestTimes = {},     -- Per-Dungeon/Variant Best Times
-    history = {},       -- Last 10 Runs
+      history = {},       -- Last 500 Runs
     lastRun = {},       -- Unfinished Run State
     lastSelection = {}, -- Last Selected Dungeon
     position = {},      -- Window Position

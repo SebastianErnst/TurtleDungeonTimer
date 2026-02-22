@@ -4,87 +4,20 @@
 
 function TurtleDungeonTimer:rebuildBossRows()
     if not self.frame then return end
-    
-    -- Clear old boss scroll frame
-    if self.frame.bossScrollFrame then
-        self.frame.bossScrollFrame:Hide()
-        self.frame.bossScrollFrame = nil
-    end
-    
+
     if table.getn(self.bossList) == 0 then
-        self:updateFrameSize()
+        if self.bossListExpanded then
+            self:collapseBossList()
+        end
+        self:updateBossListToggleState()
         return
     end
-    
-    -- Organize bosses: required first, then optional
-    local orderedBosses = {}
-    local optionalBossList = {}
-    
-    -- Separate required and optional bosses
-    for i = 1, table.getn(self.bossList) do
-        local boss = self.bossList[i]
-        local bossName = type(boss) == "table" and boss.name or boss
-        if self.optionalBosses[bossName] then
-            table.insert(optionalBossList, bossName)
-        else
-            table.insert(orderedBosses, bossName)
-        end
+
+    self:updateBossListToggleState()
+
+    if self.bossListExpanded then
+        self:expandBossList()
     end
-    
-    -- Add optional bosses at the end
-    for i = 1, table.getn(optionalBossList) do
-        table.insert(orderedBosses, optionalBossList[i])
-    end
-    
-    local bossRowHeight = 35
-    local maxVisibleBosses = 6
-    local numBosses = table.getn(orderedBosses)
-    
-    -- Calculate height: check if we have optional bosses
-    local hasOptional = false
-    for i = 1, numBosses do
-        if self.optionalBosses[orderedBosses[i]] then
-            hasOptional = true
-            break
-        end
-    end
-    
-    local headerHeight = 0
-    if hasOptional then
-        headerHeight = 20 -- Space for "Optional" header
-    end
-    
-    local scrollHeight = math.min(maxVisibleBosses, numBosses) * (bossRowHeight + 5)
-    
-    -- Create scroll frame
-    local scrollFrame = CreateFrame("ScrollFrame", nil, self.frame)
-    scrollFrame:SetWidth(240)
-    scrollFrame:SetHeight(scrollHeight)
-    scrollFrame:SetPoint("TOP", self.frame.headerBg, "BOTTOM", 0, -10)
-    self.frame.bossScrollFrame = scrollFrame
-    
-    if not self.bossListExpanded then
-        scrollFrame:Hide()
-    end
-    
-    -- Create scroll child
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(240)
-    
-    local totalHeight = numBosses * (bossRowHeight + 5) + headerHeight
-    scrollChild:SetHeight(totalHeight)
-    scrollFrame:SetScrollChild(scrollChild)
-    
-    -- Create scrollbar if needed (check if total content is taller than visible area)
-    local hasScrollbar = totalHeight > scrollHeight
-    if hasScrollbar then
-        self:createScrollbar(scrollFrame, scrollHeight, totalHeight, maxVisibleBosses, bossRowHeight, headerHeight)
-    end
-    
-    -- Create boss rows with ordered list
-    self:createBossRows(scrollChild, orderedBosses, numBosses, bossRowHeight, hasScrollbar)
-    
-    self:updateFrameSize()
 end
 
 function TurtleDungeonTimer:createScrollbar(scrollFrame, scrollHeight, totalHeight, maxVisibleBosses, bossRowHeight, headerHeight)
