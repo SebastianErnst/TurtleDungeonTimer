@@ -46,6 +46,7 @@ function TurtleDungeonTimer:start()
         self.killTimes = {}
         self.deathCount = 0
         self.runCompleted = false  -- Reset completion flag for new run
+        self.finalTime = nil
         
         -- Reset official run flag (will be set to false by preparation if needed)
         if not self.isOfficialRun then
@@ -210,6 +211,8 @@ local function resetRunDataCommon(self)
     -- Clear run data
     self.killTimes = {}
     self.deathCount = 0
+    self.runCompleted = false
+    self.finalTime = nil
     
     -- DON'T reset runWithWorldBuffs - it's a preparation setting, not run data!
     -- Only clear the player list

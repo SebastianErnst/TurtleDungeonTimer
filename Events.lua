@@ -223,6 +223,7 @@ function TurtleDungeonTimer:onAllBossesDefeated()
     self.isRunning = false
     self.runCompleted = true  -- Mark as completed to prevent double-save
     local finalTime = GetTime() - self.startTime
+    self.finalTime = finalTime
     
     -- Update progress bar (shows 100% or 100% (+x%) if overage)
     self:updateProgressBar()

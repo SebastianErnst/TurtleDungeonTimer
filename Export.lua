@@ -66,7 +66,7 @@ end
 -- Unified export function that works with both current run and history entries
 function TurtleDungeonTimer:exportRunData(entry)
     local killTimes, deathCount, dungeon, variant, playerName, guildName, groupClasses, uuid, hasWorldBuffs
-    local trashProgress, trashRequired, timestamp, completed, isOfficial
+    local trashProgress, trashRequired, timestamp, completed, isOfficial, runTime
     
     if entry then
         -- Export from history entry
@@ -81,6 +81,7 @@ function TurtleDungeonTimer:exportRunData(entry)
         hasWorldBuffs = entry.hasWorldBuffs or false
         trashProgress = entry.trashProgress or 0
         trashRequired = entry.trashRequired or 100
+        runTime = entry.time or 0
         timestamp = entry.timestamp or 0
         completed = entry.completed or false
         isOfficial = entry.isOfficial or false
@@ -111,6 +112,7 @@ function TurtleDungeonTimer:exportRunData(entry)
         timestamp = time()
         completed = false  -- Current run is not completed yet
         isOfficial = self.isOfficialRun or false
+        runTime = 0
     end
     
     if table.getn(killTimes) == 0 then
@@ -133,9 +135,13 @@ function TurtleDungeonTimer:exportRunData(entry)
     variantName = string.gsub(variantName, "[%s:]", "_")
     table.insert(parts, variantName)
     
-    -- Total time (last boss kill time)
+    -- Total time (prefer saved completion time for history exports)
     local totalTime = 0
-    if table.getn(killTimes) > 0 then
+    if entry and runTime > 0 then
+        totalTime = runTime
+    elseif self.runCompleted and self.finalTime and self.finalTime > 0 then
+        totalTime = self.finalTime
+    elseif table.getn(killTimes) > 0 then
         totalTime = killTimes[table.getn(killTimes)].time
     end
     table.insert(parts, string.format("%.0f", totalTime))
